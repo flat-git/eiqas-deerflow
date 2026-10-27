@@ -50,3 +50,22 @@ def test_custom_scripts_need_finite_serializable_output():
     code = 'import json,sys;json.dump({"rows":[{"value":float("inf")}],"provenance":[["obs-1"]]},open(sys.argv[2],"w"))'
     with pytest.raises(ValueError):
         analyze(dataset(), {"method": "python", "parameters": {"code": code, "check_code": CHECK}})
+
+
+def test_checker_format_error_explains_required_object_and_attests_failed_execution(tmp_path, monkeypatch):
+    import hashlib
+    import json
+
+    from eiqas_research import worker
+
+    checker = 'import json,sys;json.dump([{ "name":"bad root" }],open(sys.argv[3],"w"))'
+    request = tmp_path / "request.json"
+    output = tmp_path / "result.json"
+    request.write_text(json.dumps({"dataset": dataset(), "spec": {"method": "python", "parameters": {"code": CODE, "check_code": checker}}}))
+    monkeypatch.setattr(worker.sys, "argv", ["worker.py", "analyze", "--input", str(request), "--output", str(output)])
+    assert worker.main() == 1
+    result = json.loads(output.read_text())
+    assert result["status"] == "failed"
+    assert "checks.json" in result["error"] and '{"checks":' in result["error"]
+    assert result["request_sha256"] == hashlib.sha256(request.read_bytes()).hexdigest()
+    assert result["worker_sha256"] == hashlib.sha256(__import__("pathlib").Path(worker.__file__).read_bytes()).hexdigest()

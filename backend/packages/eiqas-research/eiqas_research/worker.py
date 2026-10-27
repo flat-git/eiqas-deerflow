@@ -83,10 +83,15 @@ def _custom_analysis(dataset: dict, parameters: dict) -> dict:
                 raise ValueError(f"定制方法 {name} 实际执行失败：{str(getattr(exc, 'stderr', '') or exc)[-4000:]}") from exc
         try:
             result = json.loads((directory / "output.json").read_text(encoding="utf-8"))
-            expected = json.loads((directory / "checks.json").read_text(encoding="utf-8"))["checks"]
+            check_result = json.loads((directory / "checks.json").read_text(encoding="utf-8"))
             json.dumps(result, allow_nan=False)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise ValueError("定制方法没有生成有效且有限的结果与检查文件") from exc
+        if not isinstance(result, dict):
+            raise ValueError('output.json 必须是 {"rows": [...], "provenance": [[冻结输入observation_id]], "limitations": []} 对象')
+        if not isinstance(check_result, dict) or "checks" not in check_result:
+            raise ValueError('checks.json 必须是 {"checks": [{"name": "复算说明", "row": 0, "column": "结果列", "expected": 复算数值}]} 对象，不能直接写数组')
+        expected = check_result["checks"]
     rows, provenance = result.get("rows"), result.get("provenance")
     if not isinstance(rows, list) or not rows or len(rows) > 100000 or any(not isinstance(row, dict) or not row for row in rows):
         raise ValueError("定制方法需要非空结果行")
@@ -384,6 +389,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--media-type", default="application/octet-stream")
     args = parser.parse_args()
+    data = None
+    worker_sha = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     try:
         data = args.input.read_bytes()
         if args.operation == "parse":
@@ -391,11 +398,14 @@ def main():
         else:
             request = json.loads(data)
             result = analyze(request["dataset"], request["spec"])
-        result["worker_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        result["worker_sha256"] = worker_sha
         result["request_sha256"] = hashlib.sha256(data).hexdigest()
         args.output.write_text(json.dumps(result, ensure_ascii=False, allow_nan=False))
     except Exception as exc:
-        args.output.write_text(json.dumps({"status": "failed", "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
+        failure = {"status": "failed", "error": f"{type(exc).__name__}: {exc}", "worker_sha256": worker_sha}
+        if data is not None:
+            failure["request_sha256"] = hashlib.sha256(data).hexdigest()
+        args.output.write_text(json.dumps(failure, ensure_ascii=False))
         return 1
     return 0
 

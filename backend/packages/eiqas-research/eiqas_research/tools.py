@@ -234,8 +234,11 @@ async def eiqas_execute(dataset_id: str, method: str, parameters: dict, runtime:
     discount_rates. Never call a failed or unexecuted result verified.
     Python parameters: code, check_code, arguments(optional). Calculation CLI: python analysis.py input.json output.json;
     input contains dataset/arguments. Output: rows, provenance[list of input observation IDs per row], limitations, optional partial status.
-    Independent CLI: python check.py input.json output.json checks.json. Write checks[{name,row,column,expected}]; every numeric result cell
-    must be covered. The worker compares actual/expected itself. sensitivity is cost-benefit discount-rate analysis only.
+    Independent CLI: python check.py input.json output.json checks.json. The file checks.json MUST be an OBJECT
+    {"checks":[{"name":"independent calculation", "row":0, "column":"value", "expected":12.5}]}, NOT a bare array.
+    The primary output MUST be an OBJECT {"rows":[...],"provenance":[[actual_input_observation_id,...]],"limitations":[]}.
+    Every numeric result cell must be covered by an independently computed expected number; provenance cannot be empty or invented.
+    The worker supplies input/script hashes and compares actual/expected itself. sensitivity is cost-benefit discount-rate analysis only.
     """
     from deerflow.sandbox.tools import ensure_sandbox_initialized_async
 
