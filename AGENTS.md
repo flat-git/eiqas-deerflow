@@ -236,3 +236,11 @@ These apply repo-wide; module guides own the module-specific detail.
   `scripts/verify_versions.sh <ver>` to catch drift early. See [RELEASING.md](RELEASING.md).
 - **Don't edit `CLAUDE.md`** — it only contains `@AGENTS.md`. All agent guidance changes
   belong here in `AGENTS.md`; `CLAUDE.md` is a thin import shim.
+
+## EIQAS product edition
+
+This is the independent EIQAS product repository. The pinned upstream identity is in `UPSTREAM.md`; actual product scope/status is in `task_plan.md` and `docs/eiqas-development.md`. Preserve upstream license notices.
+
+Only `.github/workflows/eiqas-*` automation is active. The upstream workflows are retained under `.github/upstream-workflows/` as reference and must not be re-enabled wholesale. EIQAS release destinations belong to `flat-git/eiqas-deerflow`.
+
+Do not import legacy private EIQAS source history, data or credentials. Tests must distinguish fixtures from live model/OCR acceptance. New product business behavior belongs to its own extension package; keep the Harness/app dependency boundary intact.

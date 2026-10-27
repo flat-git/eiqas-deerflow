@@ -69,3 +69,12 @@ config.yaml.bak
 
 # Monocle agent-observability trace output (local file exporter)
 .monocle/
+
+# EIQAS local research and OCR caches
+.eiqas/
+.ocr-cache/
+models/
+.cache/
+.pytest_cache/
+*.sqlite3
+*.sqlite

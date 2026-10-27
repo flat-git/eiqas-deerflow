@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible EIQAS problem using public or synthetic data.
+labels: [bug]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and minimal public or synthetic example
+      description: Do not include API keys, private research files or complete provider payloads.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version, platform and redacted diagnostics
