@@ -1,0 +1,148 @@
+import { afterEach, expect, rs, test } from "@rstest/core";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
+import { ReportView } from "@/components/eiqas/report-view";
+import type { Report } from "@/core/eiqas/types";
+
+rs.mock("@/components/eiqas/result-chart", () => ({
+  ResultChart: ({ subjects }: { subjects: string[] }) => (
+    <p>图表筛选：{subjects.join(",") || "全部"}</p>
+  ),
+}));
+rs.mock("@/components/eiqas/evidence-panel", () => ({
+  EvidencePanel: ({
+    selection,
+  }: {
+    selection: { title: string; observations: { id: string }[] } | null;
+  }) =>
+    selection ? (
+      <div role="dialog">
+        {selection.title}：
+        {selection.observations.map((row) => row.id).join(",")}
+      </div>
+    ) : null,
+}));
+rs.mock("@/core/eiqas/api", () => ({
+  eiqasURL: (path: string) => path,
+  downloadExport: rs.fn(),
+}));
+
+afterEach(cleanup);
+
+function report(): Report {
+  return {
+    id: "report-one",
+    research_id: "research-one",
+    run_id: "run-one",
+    title: "合成趋势研究",
+    question: "收入如何变化？",
+    summary: "完整范围结论不随展示筛选而变化。",
+    created_at: "2026-01-01T00:00:00Z",
+    scope: { answerable: ["收入变化"], gaps: ["尚不能证明因果"] },
+    implications: ["核查差异来源"],
+    limitations: ["仅合成样例"],
+    findings: ["发现一", "发现二", "发现三", "发现四"].map((text) => ({
+      text,
+      kind: "fact",
+      cells: [
+        {
+          row: 0,
+          column: "value",
+          value: 100,
+          unit: "CNY",
+          observation_ids: ["obs-a"],
+        },
+      ],
+      observation_ids: [],
+      evidence: [],
+    })),
+    charts: [
+      {
+        id: "chart",
+        title: "收入变化",
+        type: "bar",
+        x: "subject",
+        y: "value",
+        unit: "CNY",
+        explanation: "合成数据",
+      },
+    ],
+    dataset: {
+      id: "data",
+      title: "冻结输入",
+      input_hash: "hash",
+      rows: [],
+      observations: [
+        {
+          id: "obs-a",
+          source_id: "source-a",
+          extraction_id: "extract-a",
+          source_hash: "hash",
+          raw_text: "收入 100 元",
+          value: "100",
+          unit: "元",
+          subject: "甲",
+          period: "2025",
+          metric: "收入",
+          qualifier: "exact",
+          status: "verified",
+          flags: [],
+          locator: { key: "row-1", text: "收入 100 元" },
+        },
+      ],
+    },
+    sources: [],
+    provenance: [["obs-a"], ["obs-b"]],
+    plan: {
+      hash: "plan-hash",
+      revision: 1,
+      confirmed_at: "2026-01-01",
+      content: {
+        question: "问题",
+        methods: [{ name: "聚合", rationale: "描述", operation: "aggregate" }],
+        required_data: [],
+        outputs: ["图表"],
+        assumptions: [],
+        limitations: [],
+      },
+    },
+    run: {
+      id: "run-one",
+      dataset_id: "data",
+      status: "verified",
+      spec: { method: "aggregate", parameters: {} },
+      input_hash: "hash",
+      started_at: "2026-01-01",
+      completed_at: "2026-01-01",
+      result: {
+        rows: [
+          { subject: "甲", value: 100 },
+          { subject: "乙", value: 200 },
+        ],
+        checks: [{ name: "实际复算", passed: true }],
+        limitations: [],
+      },
+    },
+  };
+}
+
+test("reader starts with three findings and reveals further findings on demand", () => {
+  render(<ReportView report={report()} />);
+  expect(screen.queryByText("发现四")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "展开其余 1 条发现" }));
+  expect(screen.getByText("发现四")).toBeTruthy();
+});
+
+test("subject filtering preserves the full-scope conclusion and prevents an empty selection", () => {
+  render(<ReportView report={report()} />);
+  fireEvent.click(screen.getByLabelText("乙"));
+  expect(screen.getByText("图表筛选：甲")).toBeTruthy();
+  expect(screen.getByText("完整范围结论不随展示筛选而变化。")).toBeTruthy();
+  expect(screen.getByLabelText<HTMLInputElement>("甲").disabled).toBe(true);
+});
+
+test("a finding opens its frozen input evidence in one action", () => {
+  render(<ReportView report={report()} />);
+  fireEvent.click(screen.getAllByRole("button", { name: "查看依据 ↗" })[0]!);
+  expect(screen.getByRole("dialog").textContent).toContain("obs-a");
+});
