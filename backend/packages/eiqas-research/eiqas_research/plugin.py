@@ -39,6 +39,7 @@ class ResearchContext(AgentMiddleware):
                 "conflicting definitions, uncertain OCR or material objective/method changes. "
                 "Never turn disclosure counts or business background metrics into an AI ability score. "
                 "Only actual checked calculations support verified quantitative conclusions. "
+                "Register literal original numbers and original units; do not preconvert or round candidates. Dataset freezing performs supported unit normalization. "
                 "Keep execution state, answerable scope and missing evidence separate."
             )
             original = request.system_message.content if request.system_message else ""

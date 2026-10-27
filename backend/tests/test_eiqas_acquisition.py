@@ -89,3 +89,25 @@ def test_doh_private_answer_is_rejected_before_connection(evidence, monkeypatch)
     with httpx.Client(transport=httpx.MockTransport(forbidden)) as client:
         result = acquire_source(service, rid, "https://example.org/original", "Public source", "test", client=client)
     assert result["status"] == "failed"
+
+
+def test_redirect_keeps_final_public_url_for_relative_links(evidence):
+    service, rid = evidence
+
+    def respond(request):
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "/reports/index.html"})
+        return httpx.Response(200, content=b"<p>Report</p>", headers={"content-type": "text/html"})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        result = acquire_source(service, rid, "https://example.org/start", "Report", "test", client=client)
+    assert result["url"] == "https://example.org/start"
+    assert result["retrieved_url"] == "https://example.org/reports/index.html"
+
+
+def test_http_status_is_preserved_in_failure(evidence):
+    service, rid = evidence
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(503))) as client:
+        result = acquire_source(service, rid, "https://example.org/down", "Unavailable", "test", client=client)
+    assert result["status"] == "failed"
+    assert "HTTP 503" in result["reason"]

@@ -15,6 +15,7 @@ from .service import Conflict, NotFound, ResearchService, canonical, digest, now
 # No implicit currency conversion. Ratios are normalized only from explicit units.
 UNITS = {
     "元": ("CNY", "1"),
+    "千元": ("CNY", "1000"),
     "万元": ("CNY", "10000"),
     "亿元": ("CNY", "100000000"),
     "CNY": ("CNY", "1"),
@@ -82,8 +83,9 @@ class EvidenceService:
         if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username or parts.password:
             raise ValueError("来源必须是无登录凭据的公开 HTTP(S) URL")
 
-    def register_source(self, rid: str, *, url: str, title: str, organization: str, content: bytes, media_type: str) -> dict:
+    def register_source(self, rid: str, *, url: str, title: str, organization: str, content: bytes, media_type: str, retrieved_url: str | None = None) -> dict:
         self._url(url)
+        self._url(retrieved_url or url)
         if not content or len(content) > 64 * 1024 * 1024:
             raise ValueError("原件为空或超过 64 MiB")
         name = uuid.uuid4().hex
@@ -94,7 +96,18 @@ class EvidenceService:
         return self.put(
             rid,
             "source",
-            {"url": url, "title": title, "organization": organization, "retrieved_at": now(), "status": "acquired", "media_type": media_type, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content), "path": relative},
+            {
+                "url": url,
+                "retrieved_url": retrieved_url or url,
+                "title": title,
+                "organization": organization,
+                "retrieved_at": now(),
+                "status": "acquired",
+                "media_type": media_type,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+                "path": relative,
+            },
         )
 
     def record_source_failure(self, rid: str, *, url: str, title: str, organization: str, reason: str, status: str = "failed") -> dict:
@@ -157,8 +170,11 @@ class EvidenceService:
         elif data["unit"] not in UNITS:
             flags.append("unit_unrecognized")
         unit_text = re.sub(r"\s+", "", data["raw_text"])
-        explicit_units = re.findall(r"亿元|万元|万台|MWh|kWh|USD|CNY|(?<!万|亿)元|%|吨|kg", unit_text)
-        if explicit_units and data["unit"] not in explicit_units:
+        explicit_units = re.findall(r"亿元|万元|千元|万台|MWh|kWh|USD|CNY|(?<!万|亿|千)元|%|吨|kg|人|台|项|个|小时", unit_text)
+        # Annual-report rows often include a neighboring growth-% column. A
+        # percentage alone cannot establish that an amount/count unit is wrong.
+        competing_units = [unit for unit in explicit_units if unit != "%"]
+        if competing_units and data["unit"] not in explicit_units:
             flags.append("unit_conflict")
         for pattern, qualifier in [(r"超过|逾|大于|以上|more than|over\s+\d", "more_than"), (r"少于|低于|不足|以下|less than|under\s+\d", "less_than"), (r"约|大约|近|about|approximately", "about")]:
             if data["qualifier"] == "exact" and re.search(pattern, data["raw_text"], re.IGNORECASE):
@@ -225,3 +241,17 @@ class EvidenceService:
             snapshots.append(obs)
         content = {"title": title, "rows": rows, "observations": snapshots}
         return self.put(rid, "dataset", {**content, "input_hash": digest(content)})
+
+    def withdraw_observation(self, rid: str, oid: str, *, reason: str) -> dict:
+        """An agent may retract an invalid registration, never approve or edit it."""
+        if not reason.strip():
+            raise ValueError("撤回候选数据需要说明登记错误与重新处理方式")
+        with self.research._connection() as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            obs = self.get(rid, "observation", oid)
+            if obs["status"] != "review" or obs["corrections"]:
+                raise Conflict("只能撤回尚未核对、尚未成为可用数据的候选登记；不得撤回人工核对或冻结数据")
+            obs.update(status="withdrawn", withdrawal={"actor": "agent", "at": now(), "reason": reason})
+            db.execute("UPDATE records SET body=? WHERE id=? AND research_id=?", (canonical(obs), oid, rid))
+            self.research._event(db, rid, "observation.withdrawn", {"id": oid, "reason": reason, "actor": "agent"})
+        return obs

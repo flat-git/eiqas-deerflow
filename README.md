@@ -42,6 +42,8 @@ docker compose --env-file .env --env-file .eiqas/deploy.env -f compose.eiqas.yam
 
 打开 [研究工作台](http://127.0.0.1:2026/research)，首次由本人创建本地管理员。创建问题、讨论并确认方案后自动推进；在数据核对队列处理关键冲突和OCR存疑值。成果页提供图表、来源、参数重算及离线交付。具体运行与验证说明见 [English Quickstart](docs/quickstart-en.md)。
 
+默认搜索复用原生 DuckDuckGo；默认正文读取由 EIQAS 直接下载公开原件并在原生 AIO 沙箱解析，无需第三方正文读取服务的密钥。网页保留哈希、文本定位及原文链接；重定向逐次检查公网地址，访问受限、超时和解析失败分别保留记录。搜索摘要仅作为线索。
+
 ## Contributing / English
 
 EIQAS is an independent, early-stage quantitative business research product built on DeerFlow. It connects research questions, public evidence, executable analysis and interactive findings. See the roadmap for implemented and pending capabilities. Use issue-linked feature branches, small pull requests and Conventional Commits. Do not submit research data or credentials.
@@ -54,6 +56,6 @@ MIT. Original DeerFlow copyright and third-party notices are retained. This inde
 
 独立业务扩展已贯通研究确认、原件保存、定位提取、数据核对、冻结数据集、真实计算回执、交互成果和HTML/Markdown/CSV/ZIP导出；五阶段页面复用原生模型、线程和对话。生成的Python方法在分析沙箱执行，并由第二个程序独立复核每个数值单元格。
 
-已通过原生模型/工具往返、自制中英扫描OCR、81项EIQAS后端测试、1632项完整前端单元测试、九项桌面滚动与追问布局测试，以及断网容器计算与ZIP重跑。完整真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
+已通过原生模型/工具往返、自制中英扫描OCR、93项EIQAS后端测试、1632项完整前端单元测试、九项桌面滚动与追问布局测试，以及断网容器计算与ZIP重跑。真实联网自检覆盖原生搜索、海尔网页、公开PDF、世界银行JSON与沙箱内HTTPS。完整真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 [公开进度看板](https://github.com/users/flat-git/projects/1)按M0—M5跟踪实际验收，未完成的验收任务保持开放。

@@ -60,14 +60,19 @@ def acquire_source(evidence: EvidenceService, rid: str, url: str, title: str, or
                     if size > 64 * 1024 * 1024:
                         raise ValueError("原件超过 64 MiB")
                     parts.append(chunk)
-                source = evidence.register_source(rid, url=url, title=title, organization=organization, content=b"".join(parts), media_type=response.headers.get("content-type", "application/octet-stream").split(";")[0])
+                source = evidence.register_source(
+                    rid, url=url, retrieved_url=current, title=title, organization=organization, content=b"".join(parts), media_type=response.headers.get("content-type", "application/octet-stream").split(";")[0]
+                )
                 # The requested URL stays canonical; retrieval routes are audit events.
                 with evidence.research._connection() as db, db:
                     evidence.research._event(db, rid, "source.retrieved", {"id": source["id"], "routes": routes})
                 return source
         raise ValueError("重定向次数超限")
     except (ValueError, httpx.HTTPError) as exc:
-        reason = str(exc) if isinstance(exc, ValueError) else f"取得失败：{type(exc).__name__}"
+        if isinstance(exc, httpx.HTTPStatusError):
+            reason = f"HTTP {exc.response.status_code}"
+        else:
+            reason = str(exc) if isinstance(exc, ValueError) else f"取得失败：{type(exc).__name__}"
         return evidence.record_source_failure(rid, url=url, title=title, organization=organization, reason=reason)
     finally:
         if own_client:

@@ -841,7 +841,13 @@ function ObservationRow({
             observation.status === "review" ? "eiqas-caution" : "eiqas-muted"
           }
         >
-          {observation.status === "review" ? "需要核对" : "已通过校验"}
+          {observation.status === "review"
+            ? "需要核对"
+            : observation.status === "verified"
+              ? "已通过校验"
+              : observation.status === "withdrawn"
+                ? "登记已撤回"
+                : observation.status}
         </span>
         {observation.locator.ocr && <small>扫描识别</small>}
       </td>

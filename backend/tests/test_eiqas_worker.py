@@ -78,3 +78,15 @@ def test_csv_and_web_json_have_cell_locators(tmp_path):
     source.write_text('[{"page":1},[{"date":"2024","value":12.5}]]')
     parsed = parse_document(source, "application/json")
     assert any(block["text"] == "12.5" and block["path"] == "$[1][0].value" for block in parsed["blocks"])
+
+
+def test_web_text_and_links_have_saved_original_locators(tmp_path):
+    source = tmp_path / "page.html"
+    source.write_text('<html><title>公开报告</title><script>secret()</script><h1>年度研究</h1><p>收入1200元</p><a href="files/report.pdf">下载年报</a></html>', encoding="utf-8")
+    parsed = parse_document(source, "text/html")
+    assert parsed["title"] == "公开报告"
+    assert any(block["text"] == "收入1200元" for block in parsed["blocks"])
+    link = next(block for block in parsed["blocks"] if block.get("href"))
+    assert link["href"] == "files/report.pdf"
+    assert link["text"] == "下载年报" and link["key"].startswith("web:link:")
+    assert not any("secret()" in block["text"] for block in parsed["blocks"])

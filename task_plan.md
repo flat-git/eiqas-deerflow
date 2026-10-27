@@ -43,3 +43,12 @@ See [development notes](docs/eiqas-development.md) and the GitHub roadmap. Keep 
 - 完整前端单元测试1632项通过（包含3项新增成果交互测试）；本机Node25需要禁用实验WebStorage以免与happy-dom冲突。生产使用Node22。类型/格式复查进行中。
 - 五阶段工作台、原生对话、独立成果页、图表筛选、冻结数据依据、对话重算入口和离线HTML/MD/CSV/ZIP已实现。浏览器、离线断网与ZIP重跑验收未完成。
 - 仍需：自定义Python方法、完整原生模型研究闭环、官方资料与世界银行案例、真实纠正操作、读者试读、Project布局/自动化核验、RC与发布。
+
+### 联网与真实数据准备复验
+
+- 自定义Python计算及独立检查已实现并通过回归；断网容器计算、四类导出和ZIP实际重跑已通过。离线HTML浏览器交互仍待验收。
+- 默认Jina正文服务实际返回401；已改为EIQAS直接取得公开原件，经原生AIO解析并保存定位。真实原生搜索、海尔网页、W3C PDF、世界银行JSON和沙箱内HTTPS五项均通过。脚本为 `scripts/acceptance/public_network.py`，回执在忽略的 `.deer-flow/acceptance/network-fixed`。
+- 真实年报准备发现千元缺失、相邻增速百分号误报及Agent提前换算。已补单位归一化和回归，候选必须登记原值/原单位；Agent可审计撤回未核对错误登记，不能批准、改写或撤回已核对数据。
+- 新增线程内记录读取工具，刷新或上下文压缩后可恢复已有来源、数据集与运行；提取元数据不会返回整个PDF文本。
+- 独立无操作员配置检出：完整后端17099 passed、188 skipped、3 deselected；阻塞IO143 passed。当前扩展93 passed。最终变更的完整CI复验与真实研究成果仍在进行。
+- 尚未通过实际读者试读，未创建RC或正式Release；所有需要实际验收的Issue保持开放。

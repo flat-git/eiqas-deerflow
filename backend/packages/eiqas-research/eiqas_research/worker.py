@@ -349,6 +349,7 @@ def parse_document(path: Path, media_type: str) -> dict:
         from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(data, "html.parser")
+        title = soup.title.get_text(" ", strip=True) if soup.title else ""
         for tag in soup(["script", "style", "noscript"]):
             tag.decompose()
         for index, tag in enumerate(soup.find_all(["p", "h1", "h2", "h3", "li", "tr"])):
@@ -357,12 +358,17 @@ def parse_document(path: Path, media_type: str) -> dict:
                 blocks.append({"key": f"web:{index}", "text": text, "element": tag.name, "ocr": False})
         if not blocks and soup.get_text(" ", strip=True):
             blocks.append({"key": "web:body", "text": soup.get_text(" ", strip=True), "ocr": False})
+        for index, tag in enumerate(soup.find_all("a", href=True)):
+            blocks.append({"key": f"web:link:{index}", "text": tag.get_text(" ", strip=True), "href": tag["href"], "element": "a", "ocr": False})
         engine = "beautifulsoup4"
     else:
         blocks = [{"key": f"line:{index + 1}", "text": line, "line": index + 1, "ocr": False} for index, line in enumerate(data.decode("utf-8-sig").splitlines()) if line.strip()]
     if not blocks:
         raise ValueError("没有可定位的文本或表格")
-    return {"engine": engine, "page_count": page_count, "blocks": blocks}
+    result = {"engine": engine, "page_count": page_count, "blocks": blocks}
+    if engine == "beautifulsoup4":
+        result["title"] = title
+    return result
 
 
 def _table_blocks(frame, sheet):

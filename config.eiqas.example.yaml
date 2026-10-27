@@ -23,7 +23,7 @@ tools:
     max_results: 5
   - name: web_fetch
     group: web
-    use: deerflow.community.jina_ai.tools:web_fetch_tool
+    use: eiqas_research.tools:web_fetch_public
   - name: ls
     group: file:read
     use: deerflow.sandbox.tools:ls_tool
@@ -42,6 +42,9 @@ tools:
   - name: eiqas_read_research
     group: research
     use: eiqas_research.tools:eiqas_read_research
+  - name: eiqas_read_records
+    group: research
+    use: eiqas_research.tools:eiqas_read_records
   - name: eiqas_save_plan
     group: research
     use: eiqas_research.tools:eiqas_save_plan
@@ -60,6 +63,9 @@ tools:
   - name: eiqas_add_observations
     group: research
     use: eiqas_research.tools:eiqas_add_observations
+  - name: eiqas_withdraw_observation
+    group: research
+    use: eiqas_research.tools:eiqas_withdraw_observation
   - name: eiqas_create_dataset
     group: research
     use: eiqas_research.tools:eiqas_create_dataset

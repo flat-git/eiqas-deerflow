@@ -144,3 +144,46 @@ def test_explicit_human_unit_and_period_correction_remains_generic(evidence):
     assert dataset["rows"][0]["unit"] == "微克/升"
     assert dataset["rows"][0]["period"] == "2025-03"
     assert fixed["corrections"][-1]["before"]["period"] == "2024"
+
+
+def test_thousands_are_registered_as_raw_values_then_normalized(evidence):
+    e, rid = evidence
+    s, x = source(e, rid, text="单位：千元 收入1,200")
+    obs = observation(e, rid, s, x, raw_text="单位：千元 收入1,200", unit="千元")
+    assert obs["status"] == "verified"
+    dataset = e.create_dataset(rid, "保留原值后统一换算", [obs["id"]])
+    assert dataset["rows"][0]["value"] == "1200000"
+    assert dataset["observations"][0]["value"] == "1200"
+    converted = observation(e, rid, s, x, raw_text="单位：千元 收入1,200", value="120", unit="万元")
+    assert {"number_mismatch", "unit_conflict"} <= set(converted["flags"])
+
+
+@pytest.mark.parametrize("text,value,unit", [("研发人员数量（人）23,926 23,693 0.98%", "23926", "人"), ("研发费用17,787,624 16,232,771 9.58%", "17787624", "千元")])
+def test_neighboring_growth_column_does_not_override_original_amount_unit(evidence, text, value, unit):
+    e, rid = evidence
+    s, x = source(e, rid, text=text)
+    obs = observation(e, rid, s, x, raw_text=text, value=value, unit=unit)
+    assert obs["status"] == "verified"
+
+
+def test_agent_can_withdraw_its_invalid_unreviewed_candidate_but_not_frozen_data(evidence):
+    e, rid = evidence
+    s, x = source(e, rid)
+    wrong = observation(e, rid, s, x, value="120")
+    with pytest.raises(ValueError):
+        e.withdraw_observation(rid, wrong["id"], reason="")
+    withdrawn = e.withdraw_observation(rid, wrong["id"], reason="登记时提前换算；将按原文重新登记")
+    assert withdrawn["status"] == "withdrawn"
+    assert withdrawn["value"] == "120" and withdrawn["raw_text"] == wrong["raw_text"]
+    assert withdrawn["withdrawal"]["actor"] == "agent"
+    assert e.research.events(rid)[-1]["kind"] == "observation.withdrawn"
+    with pytest.raises(Conflict):
+        e.create_dataset(rid, "不能使用撤回项", [wrong["id"]])
+    valid = observation(e, rid, s, x)
+    e.create_dataset(rid, "冻结数据", [valid["id"]])
+    with pytest.raises(Conflict):
+        e.withdraw_observation(rid, valid["id"], reason="不能更改已经可用的数据")
+    reviewed = observation(e, rid, s, x, value="130")
+    e.correct_observation(rid, reviewed["id"], value="1200", unit="万元", reason="人工确认原值")
+    with pytest.raises(Conflict):
+        e.withdraw_observation(rid, reviewed["id"], reason="不得撤回人工确认")
