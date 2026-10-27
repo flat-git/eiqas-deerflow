@@ -56,6 +56,6 @@ MIT. Original DeerFlow copyright and third-party notices are retained. This inde
 
 独立业务扩展已贯通研究确认、原件保存、定位提取、数据核对、冻结数据集、真实计算回执、交互成果和HTML/Markdown/CSV/ZIP导出；五阶段页面复用原生模型、线程和对话。生成的Python方法在分析沙箱执行，并由第二个程序独立复核每个数值单元格。
 
-已通过原生模型/工具往返、自制中英扫描OCR、93项EIQAS后端测试、1632项完整前端单元测试、九项桌面滚动与追问布局测试，以及断网容器计算与ZIP重跑。真实联网自检覆盖原生搜索、海尔网页、公开PDF、世界银行JSON与沙箱内HTTPS。完整真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
+已通过原生模型/工具往返、自制中英扫描OCR、94项EIQAS后端测试、1634项完整前端单元测试、九项桌面滚动与追问布局测试、三项断网HTML浏览器测试，以及实际容器计算与ZIP重跑。美的／海尔案例已生成6张图和26项逐格复算；合成成本收益情景亦通过。真实联网自检覆盖原生搜索、海尔网页、公开PDF、世界银行JSON与沙箱内HTTPS。跨主题真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 [公开进度看板](https://github.com/users/flat-git/projects/1)按M0—M5跟踪实际验收，未完成的验收任务保持开放。

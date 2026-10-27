@@ -24,6 +24,8 @@ export function formatNumber(value: unknown, unit = ""): string {
   if (!Number.isFinite(number)) return "—";
   if (unit === "ratio")
     return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(number * 100)}%`;
+  if (unit === "%" || unit === "百分点")
+    return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 4 }).format(number)}${unit === "百分点" ? "个百分点" : unit}`;
   if (number !== 0 && Math.abs(number) < 0.001) return number.toExponential(2);
   if (unit === "CNY" && Math.abs(number) >= 1e8)
     return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(number / 1e8)}亿元`;

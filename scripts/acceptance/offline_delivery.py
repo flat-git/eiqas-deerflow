@@ -51,12 +51,23 @@ def main():
     root = args.output.resolve()
     root.mkdir(parents=True, exist_ok=True)
     research = ResearchService(root / "state")
-    rid = research.create(ResearchCreate(thread_id="synthetic-offline-" + __import__("uuid").uuid4().hex[:10], question="合成流程验收：两个区域的收入如何变化？"))["id"]
+    rid = research.create(
+        ResearchCreate(
+            thread_id="synthetic-offline-" + __import__("uuid").uuid4().hex[:10],
+            question="合成流程验收：两个区域的收入如何变化？",
+        )
+    )["id"]
     plan = research.save_plan(
         rid,
         Plan(
             question=research.get(rid)["question"],
-            methods=[{"name": "增长分析", "operation": "growth", "rationale": "检验基期与当期独立复算及来源回查"}],
+            methods=[
+                {
+                    "name": "增长分析",
+                    "operation": "growth",
+                    "rationale": "检验基期与当期独立复算及来源回查",
+                }
+            ],
             required_data=["明确标注的自制合成CSV"],
             outputs=["增长率与实际收入图表"],
             limitations=["合成测试数据，不代表企业实际表现"],
@@ -65,28 +76,90 @@ def main():
     # This explicit synthetic test fixture simulates the human gate only here.
     research.confirm_plan(rid, plan["hash"])
     evidence = EvidenceService(research)
-    records = [("区域甲", "2024", "100"), ("区域甲", "2025", "125"), ("区域乙", "2024", "80"), ("区域乙", "2025", "92")]
-    lines = ["subject,period,revenue,unit", *[f"{subject},{period},{value},元" for subject, period, value in records]]
-    source = evidence.register_source(rid, url="https://example.org/eiqas/synthetic-fixture.csv", title="自制合成区域收入样例（非企业披露）", organization="EIQAS synthetic test", content="\n".join(lines).encode(), media_type="text/csv")
+    records = [
+        ("区域甲", "2024", "100"),
+        ("区域甲", "2025", "125"),
+        ("区域乙", "2024", "80"),
+        ("区域乙", "2025", "92"),
+    ]
+    lines = [
+        "subject,period,revenue,unit",
+        *[f"{subject},{period},{value},元" for subject, period, value in records],
+    ]
+    source = evidence.register_source(
+        rid,
+        url="https://example.org/eiqas/synthetic-fixture.csv",
+        title="自制合成区域收入样例（非企业披露）",
+        organization="EIQAS synthetic test",
+        content="\n".join(lines).encode(),
+        media_type="text/csv",
+    )
     extraction = evidence.register_extraction(
-        rid, source["id"], {"engine": "synthetic-fixture", "page_count": None, "blocks": [{"key": f"row:{i + 2}", "text": records[i][2], "sheet": "CSV", "row": i + 2, "column": "revenue", "ocr": False} for i, line in enumerate(lines[1:])]}
+        rid,
+        source["id"],
+        {
+            "engine": "synthetic-fixture",
+            "page_count": None,
+            "blocks": [
+                {
+                    "key": f"row:{i + 2}",
+                    "text": records[i][2],
+                    "sheet": "CSV",
+                    "row": i + 2,
+                    "column": "revenue",
+                    "ocr": False,
+                }
+                for i, line in enumerate(lines[1:])
+            ],
+        },
     )
     observations = [
         evidence.add_observation(
-            rid, {"source_id": source["id"], "extraction_id": extraction["id"], "locator_key": f"row:{i + 2}", "raw_text": value, "subject": subject, "period": period, "metric": "收入", "value": value, "unit": "元", "qualifier": "exact"}
+            rid,
+            {
+                "source_id": source["id"],
+                "extraction_id": extraction["id"],
+                "locator_key": f"row:{i + 2}",
+                "raw_text": value,
+                "subject": subject,
+                "period": period,
+                "metric": "收入",
+                "value": value,
+                "unit": "元",
+                "qualifier": "exact",
+            },
         )
         for i, (subject, period, value) in enumerate(records)
     ]
-    dataset = evidence.create_dataset(rid, "合成区域收入", [obs["id"] for obs in observations])
+    dataset = evidence.create_dataset(
+        rid, "合成区域收入", [obs["id"] for obs in observations]
+    )
     analysis = AnalysisService(evidence)
-    run = analysis.start_run(rid, dataset["id"], {"method": "growth", "parameters": {"metric": "收入"}}, native_run_id=None)
+    run = analysis.start_run(
+        rid,
+        dataset["id"],
+        {"method": "growth", "parameters": {"metric": "收入"}},
+        native_run_id=None,
+    )
     directory = analysis.run_directory(rid, run["id"])
     output = execute(directory, "receipt.json")
-    run = analysis.complete_run(rid, run["id"], output, log="Actual pinned analysis container; --network none; exit 0")
+    run = analysis.complete_run(
+        rid,
+        run["id"],
+        output,
+        log="Actual pinned analysis container; --network none; exit 0",
+    )
     assert run["status"] == "verified", run
-    assert {row["subject"]: row["growth"] for row in run["result"]["rows"]} == {"区域甲": 0.25, "区域乙": 0.15}
+    assert {row["subject"]: row["growth"] for row in run["result"]["rows"]} == {
+        "区域甲": 0.25,
+        "区域乙": 0.15,
+    }
     indices = {row["subject"]: index for index, row in enumerate(run["result"]["rows"])}
-    research.update_scope(rid, answerable=["两个合成区域的绝对变化及增长率"], gaps=["没有因果识别设计，不能解释差异成因"])
+    research.update_scope(
+        rid,
+        answerable=["两个合成区域的绝对变化及增长率"],
+        gaps=["没有因果识别设计，不能解释差异成因"],
+    )
     result = ReportService(evidence).submit(
         rid,
         {
@@ -94,23 +167,53 @@ def main():
             "title": "合成收入趋势：区域甲增长更快",
             "summary": "区域甲收入增长25%，区域乙增长15%；差异成因尚不能判断。",
             "findings": [
-                {"text": "区域甲增长25%。", "kind": "fact", "cells": [{"row": indices["区域甲"], "column": "growth"}]},
-                {"text": "区域乙增长15%。", "kind": "fact", "cells": [{"row": indices["区域乙"], "column": "growth"}]},
+                {
+                    "text": "区域甲增长25%。",
+                    "kind": "fact",
+                    "cells": [{"row": indices["区域甲"], "column": "growth"}],
+                },
+                {
+                    "text": "区域乙增长15%。",
+                    "kind": "fact",
+                    "cells": [{"row": indices["区域乙"], "column": "growth"}],
+                },
                 {"text": "仅凭两期合成数据不能解释变化的原因。", "kind": "unknown"},
             ],
             "charts": [
-                {"id": "revenue", "title": "实际收入", "type": "bar", "x": "subject", "y": "value", "explanation": "展示2025年实际计算结果，点击柱形追溯两期冻结输入。"},
-                {"id": "growth", "title": "收入增长率", "type": "bar", "x": "subject", "y": "growth", "explanation": "基于2024/2025年合成输入独立复算。"},
+                {
+                    "id": "revenue",
+                    "title": "实际收入",
+                    "type": "bar",
+                    "x": "subject",
+                    "y": "value",
+                    "explanation": "展示2025年实际计算结果，点击柱形追溯两期冻结输入。",
+                },
+                {
+                    "id": "growth",
+                    "title": "收入增长率",
+                    "type": "bar",
+                    "x": "subject",
+                    "y": "growth",
+                    "explanation": "基于2024/2025年合成输入独立复算。",
+                },
             ],
-            "implications": ["实际业务需要进一步取得价格、销量或结构数据，才能解释变化。"],
+            "implications": [
+                "实际业务需要进一步取得价格、销量或结构数据，才能解释变化。"
+            ],
             "limitations": ["本研究为工程合成样例，不能用于商业判断。"],
         },
     )
     exports = ExportService(evidence)
-    paths = {format: exports.build(rid, result["id"], format) for format in ["html", "md", "csv", "zip"]}
+    paths = {
+        format: exports.build(rid, result["id"], format)
+        for format in ["html", "md", "csv", "zip"]
+    }
     unpacked = root / "unpacked"
     with zipfile.ZipFile(paths["zip"]) as archive:
-        assert all(not name.startswith("/") and ".." not in Path(name).parts for name in archive.namelist())
+        assert all(
+            not name.startswith("/") and ".." not in Path(name).parts
+            for name in archive.namelist()
+        )
         archive.extractall(unpacked)
     manifest = json.loads((unpacked / "manifest.json").read_text())
     for name, sha in manifest["files"].items():
@@ -125,11 +228,18 @@ def main():
         "report_id": result["id"],
         "container_network": "none",
         "exports": {format: str(path) for format, path in paths.items()},
-        "checks": {"actual_calculation": True, "independent_result_values": True, "package_checksums": True, "zip_replay_rows_and_checks": True},
+        "checks": {
+            "actual_calculation": True,
+            "independent_result_values": True,
+            "package_checksums": True,
+            "zip_replay_rows_and_checks": True,
+        },
         "reader_trial": "pending",
         "browser_offline": "pending",
     }
-    (root / "receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2))
+    (root / "receipt.json").write_text(
+        json.dumps(receipt, ensure_ascii=False, indent=2)
+    )
     print(json.dumps(receipt, ensure_ascii=False))
 
 

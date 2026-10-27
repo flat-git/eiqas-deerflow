@@ -29,6 +29,7 @@ export function ReportView({
   const [selection, setSelection] = useState<EvidenceSelection | null>(null);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [findingsOpen, setFindingsOpen] = useState(false);
+  const [limitationsOpen, setLimitationsOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
   const [parametersOpen, setParametersOpen] = useState(false);
   const [dataTable, setDataTable] = useState("rows");
@@ -308,10 +309,24 @@ export function ReportView({
               <span className="eiqas-eyebrow">BOUNDARIES</span>
               <h2>哪些问题仍不能判断</h2>
               <ul>
-                {report.limitations.map((text, index) => (
+                {(limitationsOpen
+                  ? report.limitations
+                  : report.limitations.slice(0, 5)
+                ).map((text, index) => (
                   <li key={index}>{text}</li>
                 ))}
               </ul>
+              {report.limitations.length > 5 && (
+                <button
+                  className="eiqas-text-button"
+                  onClick={() => setLimitationsOpen(!limitationsOpen)}
+                  aria-expanded={limitationsOpen}
+                >
+                  {limitationsOpen
+                    ? "收起次要限制"
+                    : `展开完整限制（另 ${report.limitations.length - 5} 条）`}
+                </button>
+              )}
             </section>
           </div>
           {onRecompute && (

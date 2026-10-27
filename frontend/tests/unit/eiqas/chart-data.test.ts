@@ -31,4 +31,9 @@ describe("result-backed chart data", () => {
     expect(formatNumber(0.1, "ratio")).toBe("10%");
     expect(formatNumber(0.000001)).toContain("e-");
   });
+  it("keeps percentage levels distinct from normalized ratios", () => {
+    expect(formatNumber(3.897, "%")).toBe("3.897%");
+    expect(formatNumber(0.03897, "ratio")).toBe("3.9%");
+    expect(formatNumber(-0.414, "百分点")).toBe("-0.414个百分点");
+  });
 });

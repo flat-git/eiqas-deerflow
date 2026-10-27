@@ -146,3 +146,16 @@ test("a finding opens its frozen input evidence in one action", () => {
   fireEvent.click(screen.getAllByRole("button", { name: "查看依据 ↗" })[0]!);
   expect(screen.getByRole("dialog").textContent).toContain("obs-a");
 });
+
+test("secondary limitations expand without losing the primary judgment boundaries", () => {
+  const content = report();
+  content.limitations = Array.from({ length: 7 }, (_, i) => `判断边界${i + 1}`);
+  render(<ReportView report={content} />);
+  expect(screen.getByText("判断边界1")).toBeTruthy();
+  expect(screen.getByText("判断边界5")).toBeTruthy();
+  expect(screen.queryByText("判断边界6")).toBeNull();
+  fireEvent.click(
+    screen.getByRole("button", { name: "展开完整限制（另 2 条）" }),
+  );
+  expect(screen.getByText("判断边界7")).toBeTruthy();
+});
