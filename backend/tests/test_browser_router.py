@@ -333,3 +333,7 @@ def test_validate_browser_url_rejects_private_and_non_http(monkeypatch):
     assert validate_browser_url("ftp://example.com") is not None
     # A normal public URL passes (returns None = allowed).
     assert validate_browser_url("https://github.com/bytedance/deer-flow") is None
+
+
+# These offline units mock the remote service; public DNS must also be deterministic.
+pytestmark = pytest.mark.usefixtures("public_web_dns")

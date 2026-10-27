@@ -1,0 +1,64 @@
+# Native DeerFlow config. Copy to config.yaml and configure the model locally.
+config_version: 45
+log_level: info
+models:
+  - name: research
+    display_name: 研究模型
+    use: langchain_openai:ChatOpenAI
+    model: $EIQAS_MODEL_ID
+    base_url: $OPENAI_BASE_URL
+    api_key: $OPENAI_API_KEY
+    max_tokens: 8192
+    supports_vision: false
+tool_groups:
+  - name: web
+  - name: file:read
+  - name: file:write
+  - name: bash
+  - name: research
+tools:
+  - name: web_search
+    group: web
+    use: deerflow.community.ddg_search.tools:web_search_tool
+    max_results: 5
+  - name: web_fetch
+    group: web
+    use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - name: ls
+    group: file:read
+    use: deerflow.sandbox.tools:ls_tool
+  - name: read_file
+    group: file:read
+    use: deerflow.sandbox.tools:read_file_tool
+  - name: write_file
+    group: file:write
+    use: deerflow.sandbox.tools:write_file_tool
+  - name: str_replace
+    group: file:write
+    use: deerflow.sandbox.tools:str_replace_tool
+  - name: bash
+    group: bash
+    use: deerflow.sandbox.tools:bash_tool
+  - name: eiqas_read_research
+    group: research
+    use: eiqas_research.tools:eiqas_read_research
+  - name: eiqas_save_plan
+    group: research
+    use: eiqas_research.tools:eiqas_save_plan
+  - name: eiqas_update_scope
+    group: research
+    use: eiqas_research.tools:eiqas_update_scope
+sandbox:
+  use: deerflow.community.aio_sandbox:AioSandboxProvider
+  image: eiqas-analysis:0.1.0-dev
+  container_prefix: eiqas-sandbox
+database:
+  backend: sqlite
+  sqlite_dir: .deer-flow/data
+plugins:
+  - name: eiqas
+    use: eiqas_research:install
+    enabled: true
+    required: true
+    config:
+      data_dir: .deer-flow/eiqas

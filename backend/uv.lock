@@ -15,6 +15,7 @@ members = [
     "deer-flow",
     "deerflow-extension-api",
     "deerflow-harness",
+    "eiqas-research",
 ]
 overrides = [{ name = "websockets", specifier = "==16.0" }]
 
@@ -811,6 +812,7 @@ dependencies = [
     { name = "deerflow-harness" },
     { name = "dingtalk-stream" },
     { name = "e2b-code-interpreter" },
+    { name = "eiqas-research" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -883,6 +885,7 @@ requires-dist = [
     { name = "dingtalk-stream", specifier = ">=0.24.3" },
     { name = "discord-py", marker = "extra == 'discord'", specifier = ">=2.7.0" },
     { name = "e2b-code-interpreter", specifier = ">=2.8.1" },
+    { name = "eiqas-research", editable = "packages/eiqas-research" },
     { name = "email-validator", specifier = ">=2.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.28.0" },
@@ -1221,6 +1224,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/9b/e24eeb48fba1342f6a81e98bf6ff51622a7d5c3353a89d452623f158bcb8/e2b_code_interpreter-2.8.1.tar.gz", hash = "sha256:900bc847a4a6f90a571e0de4112531c79c550fbdb1ec94a1d2b2c9f0d058a674", size = 11467, upload-time = "2026-06-17T09:58:51.217Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/47/c9acfeb0a63925d5b2e782b496be1287665bb649eee48d947fc46b9bdeee/e2b_code_interpreter-2.8.1-py3-none-any.whl", hash = "sha256:8449ff1abb507e4c28134c9cbc4e59f76c09fadceab879c8c4031399b31a126a", size = 15210, upload-time = "2026-06-17T09:58:50.043Z" },
+]
+
+[[package]]
+name = "eiqas-research"
+version = "0.1.0.dev0"
+source = { editable = "packages/eiqas-research" }
+dependencies = [
+    { name = "deerflow-extension-api" },
+    { name = "fastapi" },
+    { name = "langchain" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "deerflow-extension-api", editable = "packages/extension-api" },
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "langchain", specifier = ">=1.0" },
+    { name = "pydantic", specifier = ">=2.0" },
 ]
 
 [[package]]

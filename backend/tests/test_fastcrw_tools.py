@@ -4,6 +4,8 @@ import ipaddress
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestWebSearchTool:
     @patch.dict("os.environ", {}, clear=True)
@@ -175,3 +177,7 @@ class TestWebFetchTool:
             "http://10.0.0.5/dashboard",
             formats=["markdown"],
         )
+
+
+# These offline units mock the remote service; public DNS must also be deterministic.
+pytestmark = pytest.mark.usefixtures("public_web_dns")

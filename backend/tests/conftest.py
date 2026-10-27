@@ -182,3 +182,24 @@ def _auto_user_context(request):
         yield
     finally:
         reset_current_user(token)
+
+
+@pytest.fixture
+def public_web_dns(monkeypatch):
+    """Public address for offline tool units; explicit per-test DNS mocks still win.
+
+    This leaves scheme/literal/private-address SSRF checks active. It does not
+    alter production resolution, nor apply to URL safety policy tests.
+    """
+    import ipaddress
+
+    from deerflow.community import url_safety
+    from deerflow.community.browser_automation import tools as browser_tools
+    from deerflow.community.browserless import tools as browserless_tools
+
+    def resolve(_hostname):
+        return [ipaddress.ip_address("8.8.8.8")]
+
+    monkeypatch.setattr(url_safety, "resolve_host_addresses", resolve)
+    monkeypatch.setattr(browser_tools, "_resolve_host_addresses", resolve)
+    monkeypatch.setattr(browserless_tools, "_resolve_host_addresses", resolve)

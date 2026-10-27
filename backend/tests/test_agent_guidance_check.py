@@ -10,6 +10,7 @@ CHECKER_PATH = REPO_ROOT / "scripts" / "check_agent_guidance.py"
 EXPECTED_GUIDANCE_PATHS = {
     "AGENTS.md",
     "backend/AGENTS.md",
+    "backend/packages/eiqas-research/AGENTS.md",
     "backend/tests/AGENTS.md",
     "frontend/AGENTS.md",
     "backend/app/gateway/AGENTS.md",
@@ -174,7 +175,7 @@ def test_local_guidance_files_contain_the_split_original_sections() -> None:
 
 def test_repository_exposes_one_local_and_one_ci_entrypoint() -> None:
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    workflow = (REPO_ROOT / ".github" / "workflows" / "lint-check.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "eiqas-guidance.yml").read_text(encoding="utf-8")
 
     assert "check-agent-guidance:" in makefile
     assert "scripts/check_agent_guidance.py" in makefile
