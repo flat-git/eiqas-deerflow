@@ -4,7 +4,7 @@ version = "0.1.0.dev0"
 description = "Question-led quantitative research extension for DeerFlow"
 requires-python = ">=3.12"
 license = "MIT"
-dependencies = ["deerflow-extension-api>=0.2.0", "fastapi>=0.115.0", "pydantic>=2.0", "langchain>=1.0"]
+dependencies = ["deerflow-extension-api>=0.2.0", "deerflow-harness==2.1.0", "httpx>=0.28.0", "fastapi>=0.115.0", "pydantic>=2.0", "langchain>=1.0"]
 
 [build-system]
 requires = ["hatchling"]

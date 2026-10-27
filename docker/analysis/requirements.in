@@ -1,0 +1,11 @@
+# Dedicated worker environment; do not modify the AIO server's Python environment.
+--extra-index-url https://download.pytorch.org/whl/cpu
+docling==2.143.0
+pandas==3.0.2
+duckdb==1.5.1
+numpy==2.4.3
+scipy==1.17.1
+openpyxl==3.1.5
+beautifulsoup4==4.14.3
+pypdfium2==5.6.0
+reportlab==4.4.10

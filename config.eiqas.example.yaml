@@ -48,10 +48,39 @@ tools:
   - name: eiqas_update_scope
     group: research
     use: eiqas_research.tools:eiqas_update_scope
+  - name: eiqas_acquire_source
+    group: research
+    use: eiqas_research.tools:eiqas_acquire_source
+  - name: eiqas_parse_source
+    group: research
+    use: eiqas_research.tools:eiqas_parse_source
+  - name: eiqas_inspect_extraction
+    group: research
+    use: eiqas_research.tools:eiqas_inspect_extraction
+  - name: eiqas_add_observations
+    group: research
+    use: eiqas_research.tools:eiqas_add_observations
+  - name: eiqas_create_dataset
+    group: research
+    use: eiqas_research.tools:eiqas_create_dataset
+  - name: eiqas_execute
+    group: research
+    use: eiqas_research.tools:eiqas_execute
+  - name: eiqas_submit_result
+    group: research
+    use: eiqas_research.tools:eiqas_submit_result
+  - name: eiqas_read_result
+    group: research
+    use: eiqas_research.tools:eiqas_read_result
 sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
   image: eiqas-analysis:0.1.0-dev
   container_prefix: eiqas-sandbox
+  runtime: docker
+  mounts:
+    - host_path: $EIQAS_OCR_CACHE_PATH
+      container_path: /opt/eiqas-cache
+      read_only: false
 database:
   backend: sqlite
   sqlite_dir: .deer-flow/data

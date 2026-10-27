@@ -42,6 +42,9 @@ async def test_public_plugin_lifecycle_and_thread_context(tmp_path):
         request = Request()
         request.runtime = SimpleNamespace(config={"configurable": {"thread_id": "other-thread"}})
         assert await middleware.awrap_model_call(request, handler) is None
+        # LangChain model middleware receives Runtime, not ToolRuntime: no config.
+        request.runtime = SimpleNamespace(context={"thread_id": "owned-thread"})
+        assert "测试研究问题" in (await middleware.awrap_model_call(request, handler)).content
     finally:
         await runtime.stop()
     with pytest.raises(RuntimeError):

@@ -19,7 +19,7 @@ v0.1 的目标是：公开资料检索与原件保存、中英文 PDF/扫描 OCR
 
 ## 开发基线
 
-Python 3.12+、Node.js 22+、**pnpm 10.26.2**、uv、Docker Desktop/Engine。基线运行命令沿用上游；EIQAS 标准配置与分析镜像正在开发，当前请以任务验收记录为准。
+Python 3.12+、Node.js 22+、**pnpm 10.26.2**、uv、Docker Desktop/Engine。标准运行使用独立 Compose 与 CPU 分析镜像，默认仅监听本机。仍在进行真实研究、桌面试用及完整交付验收。
 
 ```sh
 # 在各自目录安装锁定依赖，不使用系统中较旧的 pnpm：
@@ -31,6 +31,17 @@ npx --yes pnpm@10.26.2 install --frozen-lockfile
 
 真实模型验证需要在本机配置凭据；CI 只运行不依赖密钥的测试。不要把密钥粘贴到 Issue、PR 或提交中。
 
+## 本地启动
+
+```sh
+python3 scripts/eiqas_setup.py
+# 在忽略的 .env 中配置模型ID、地址与密钥；如有需要，调整 config.yaml 原生适配器。
+docker compose --env-file .env --env-file .eiqas/deploy.env -f compose.eiqas.yaml --profile build build
+docker compose --env-file .env --env-file .eiqas/deploy.env -f compose.eiqas.yaml up -d --wait nginx frontend gateway
+```
+
+打开 [研究工作台](http://127.0.0.1:2026/research)，首次由本人创建本地管理员。创建问题、讨论并确认方案后自动推进；在数据核对队列处理关键冲突和OCR存疑值。成果页提供图表、来源、参数重算及离线交付。具体运行与验证说明见 [English Quickstart](docs/quickstart-en.md)。
+
 ## Contributing / English
 
 EIQAS is an independent, early-stage quantitative business research product built on DeerFlow. It connects research questions, public evidence, executable analysis and interactive findings. See the roadmap for implemented and pending capabilities. Use issue-linked feature branches, small pull requests and Conventional Commits. Do not submit research data or credentials.
@@ -41,6 +52,8 @@ MIT. Original DeerFlow copyright and third-party notices are retained. This inde
 
 ## 当前可验证实现
 
-已加入独立研究扩展包、方案哈希确认、五阶段状态和范围／缺口记录。原生 Agent 工具可读取研究与保存方案，人工确认保持网页专属。参见[架构与接口](docs/architecture-eiqas.md)。当前仍在实现 v0.1，不代表 OCR、计算或完整交付已验收。
+独立业务扩展已贯通研究确认、原件保存、定位提取、数据核对、冻结数据集、真实计算回执、交互成果和HTML/Markdown/CSV/ZIP导出；五阶段页面复用原生模型、线程和对话。生成的Python方法在分析沙箱执行，并由第二个程序独立复核每个数值单元格。
 
-[公开进度看板](https://github.com/users/flat-git/projects/1)按 M0—M5 跟踪实际验收。
+已通过原生模型/工具往返、自制中英扫描OCR、81项EIQAS后端测试、1632项完整前端单元测试、九项桌面滚动与追问布局测试，以及断网容器计算与ZIP重跑。完整真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
+
+[公开进度看板](https://github.com/users/flat-git/projects/1)按M0—M5跟踪实际验收，未完成的验收任务保持开放。

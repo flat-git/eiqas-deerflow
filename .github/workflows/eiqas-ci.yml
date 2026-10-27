@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
           version: '0.11.1'
       - run: uv sync --frozen
-      - run: uv run pytest -q tests/test_harness_boundary.py tests/test_compose_default_bind_host.py tests/test_eiqas_workflow.py
+      - run: uv run pytest -q tests/test_harness_boundary.py tests/test_compose_default_bind_host.py tests/test_eiqas_*.py
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -49,4 +49,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test --config eiqas-layout.playwright.config.ts
+      - run: python ../scripts/sync_eiqas_assets.py --check
       - run: pnpm build

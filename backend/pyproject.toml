@@ -58,6 +58,7 @@ memory-zh = ["deerflow-harness[memory-zh]"]
 # the same locked runtime set without promoting those packages to core deps.
 extensions = []
 dev = [
+    "scipy==1.17.1",
     "blockbuster>=1.5.26,<1.6",
     "hypothesis>=6.100,<7",
     "jsonschema>=4.26.0",

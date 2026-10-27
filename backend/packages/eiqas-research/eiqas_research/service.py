@@ -111,39 +111,46 @@ class ResearchService:
             if body["question"] != question and body["plan"]:
                 body["plan"]["confirmed_at"] = None
                 body["status"] = "draft"
+            if body["question"] != question:
+                body["stage"] = "question"
             body["question"] = question
 
         return self._mutate(rid, "question.updated", {"question": question}, update)
 
     def save_plan(self, rid: str, plan: Plan) -> dict:
         content = plan.model_dump()
-        plan_hash = digest(content)
+        payload = {}
 
         def update(body):
+            question_hash = digest(body["question"])
+            plan_hash = digest({"content": content, "research_question_hash": question_hash})
+            payload["hash"] = plan_hash
             previous = body["plan"]
             if previous and previous["hash"] == plan_hash:
                 return
-            body["plan"] = {"content": content, "hash": plan_hash, "revision": (previous["revision"] + 1 if previous else 1), "confirmed_at": None}
+            body["stage"] = "plan"
+            body["plan"] = {"content": content, "hash": plan_hash, "research_question_hash": question_hash, "revision": (previous["revision"] + 1 if previous else 1), "confirmed_at": None}
             body["status"] = "draft"
 
-        return self._mutate(rid, "plan.saved", {"hash": plan_hash}, update)["plan"]
+        return self._mutate(rid, "plan.saved", payload, update)["plan"]
 
     def confirm_plan(self, rid: str, plan_hash: str) -> dict:
         def update(body):
             plan = body["plan"]
             if not plan or plan["hash"] != plan_hash:
                 raise Conflict("方案已更新，请核对当前方案后确认")
-            if plan["content"]["question"] != body["question"]:
+            if plan.get("research_question_hash") != digest(body["question"]):
                 raise Conflict("研究问题已变化，请更新方案")
             plan["confirmed_at"] = plan["confirmed_at"] or now()
             body["status"] = "ready"
+            body["stage"] = "data"
 
         return self._mutate(rid, "plan.confirmed", {"hash": plan_hash, "actor": "human"}, update)["plan"]
 
     def require_confirmed(self, rid: str) -> dict:
         body = self.get(rid)
         plan = body["plan"]
-        if not plan or not plan["confirmed_at"] or plan["content"]["question"] != body["question"]:
+        if not plan or not plan["confirmed_at"] or plan.get("research_question_hash") != digest(body["question"]):
             raise Conflict("请先在工作台确认当前研究方案")
         return plan
 

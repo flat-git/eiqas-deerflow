@@ -21,7 +21,9 @@ def research(service):
 
 
 def plan():
-    return Plan(question="收入变化由什么驱动？", methods=[{"name": "变化贡献", "rationale": "分解业务变化"}], required_data=["各业务收入及期间"], assumptions=[], outputs=["贡献图"], limitations=["关联不能证明因果"])
+    return Plan(
+        question="收入变化由什么驱动？", methods=[{"name": "变化贡献", "rationale": "分解业务变化", "operation": "contribution"}], required_data=["各业务收入及期间"], assumptions=[], outputs=["贡献图"], limitations=["关联不能证明因果"]
+    )
 
 
 def test_create_unique_thread_and_persist(service, research, tmp_path):
@@ -120,3 +122,18 @@ def test_thread_isolation(service, research):
 def test_corrupt_critical_plan_is_rejected():
     with pytest.raises(ValueError):
         Plan(question="问题", methods=[], required_data=[], outputs=[], assumptions=[], limitations=[])
+
+
+def test_reframed_plan_question_is_bound_to_original_research_intent(service, research):
+    from eiqas_research.service import digest
+
+    rid = research["id"]
+    proposal = plan().model_copy(update={"question": "哪些因素解释收入的变化？"})
+    saved = service.save_plan(rid, proposal)
+    assert saved["research_question_hash"] == digest(research["question"])
+    assert service.confirm_plan(rid, saved["hash"])["confirmed_at"]
+    service.update_question(rid, "改为研究利润变化")
+    with pytest.raises(Conflict, match="问题"):
+        service.confirm_plan(rid, saved["hash"])
+    rebound = service.save_plan(rid, proposal)
+    assert rebound["hash"] != saved["hash"] and rebound["confirmed_at"] is None

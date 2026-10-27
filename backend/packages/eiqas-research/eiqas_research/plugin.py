@@ -22,7 +22,9 @@ def active_service() -> ResearchService:
 
 
 def thread_id(runtime) -> str:
-    return runtime.config.get("configurable", {}).get("thread_id", "")
+    config = getattr(runtime, "config", None) or {}
+    context = getattr(runtime, "context", None) or {}
+    return config.get("configurable", {}).get("thread_id") or context.get("thread_id", "")
 
 
 class ResearchContext(AgentMiddleware):
@@ -53,6 +55,10 @@ class ResearchRuntime:
     async def start(self, deps):
         global _active
         self.service = await asyncio.to_thread(ResearchService, self.root)
+        from .analysis import AnalysisService
+        from .evidence import EvidenceService
+
+        await asyncio.to_thread(lambda: AnalysisService(EvidenceService(self.service)).recover_interrupted())
         _active = self.service
 
     async def stop(self):
