@@ -793,3 +793,7 @@ class TestBrowserlessTools:
         assert "Thread outputs path is not available" in result.update["messages"][0].content
         assert "artifacts" not in result.update
         mock_get_client.assert_not_called()
+
+
+# These offline units mock the remote service; public DNS must also be deterministic.
+pytestmark = pytest.mark.usefixtures("public_web_dns")

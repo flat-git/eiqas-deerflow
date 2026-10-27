@@ -38,3 +38,9 @@ EIQAS is an independent, early-stage quantitative business research product buil
 ## License
 
 MIT. Original DeerFlow copyright and third-party notices are retained. This independent project is not an official ByteDance release.
+
+## 当前可验证实现
+
+已加入独立研究扩展包、方案哈希确认、五阶段状态和范围／缺口记录。原生 Agent 工具可读取研究与保存方案，人工确认保持网页专属。参见[架构与接口](docs/architecture-eiqas.md)。当前仍在实现 v0.1，不代表 OCR、计算或完整交付已验收。
+
+[公开进度看板](https://github.com/users/flat-git/projects/1)按 M0—M5 跟踪实际验收。

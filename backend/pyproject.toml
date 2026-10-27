@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "deerflow-harness",
+    "eiqas-research",
     # Direct dependency on purpose, even though deerflow-harness already pulls
     # it in: app/gateway/app.py and app/gateway/services.py import the public
     # contract package themselves (the extension principal resolver, and the
@@ -106,8 +107,9 @@ default-groups = ["dev", "extensions"]
 override-dependencies = ["websockets==16.0"]
 
 [tool.uv.workspace]
-members = ["packages/harness", "packages/extension-api"]
+members = ["packages/harness", "packages/extension-api", "packages/eiqas-research"]
 
 [tool.uv.sources]
 deerflow-harness = { workspace = true }
 deerflow-extension-api = { workspace = true }
+eiqas-research = { workspace = true }

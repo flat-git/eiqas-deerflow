@@ -333,3 +333,7 @@ class TestCrawl4AiTools:
         assert tools._coerce_filter("  FIt ") == "fit"
         assert tools._coerce_filter("bogus") == "fit"
         assert tools._coerce_filter(None) == "fit"
+
+
+# These offline units mock the remote service; public DNS must also be deterministic.
+pytestmark = pytest.mark.usefixtures("public_web_dns")

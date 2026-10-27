@@ -1173,3 +1173,7 @@ async def test_live_frame_schedulers_retain_task_reference(schedule_attr, coro_a
 
     assert session._background_tasks == set()
     assert getattr(session, pending_attr) is False
+
+
+# These offline units mock the remote service; public DNS must also be deterministic.
+pytestmark = pytest.mark.usefixtures("public_web_dns")

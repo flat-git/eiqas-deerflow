@@ -13,3 +13,12 @@
 - GitHub Projects access and a real model configuration require operator action; no secrets were read, copied or committed.
 
 No research execution, OCR acceptance, reader trial or release has passed yet.
+
+## 研究契约实现
+
+- 新包 `eiqas-research` 通过公开插件注册，无 Harness 核心循环修改。
+- 首批流程测试：14 passed；证据链测试另属后续任务，尚未作为 M1 验收。
+- 固定 pnpm 10.26.2 安装及前端基线 check 成功。Docker29.6.1就绪，AIO1.11.0 ARM 镜像已下载。
+- 修改前完整后端：17002 passed、16 failed、188 skipped；15 项网页工具失败来自未隔离的 DNS 依赖，1 项来自产品化后工作流路径变更。局部修复后相关测试184 passed、1 skipped；完整复验进行中。生产 URL 防护保持原样。
+- 修改前和修改后阻塞 IO 均143 passed。
+- GitHub Project1已公开，含五个状态、阶段和优先级字段。真实模型和读者试读仍未完成。
