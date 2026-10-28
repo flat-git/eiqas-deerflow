@@ -1,0 +1,12 @@
+# Only these inputs can enter the analysis image. No runtime data or credentials.
+**
+!backend/
+!backend/packages/
+!backend/packages/eiqas-research/
+!backend/packages/eiqas-research/eiqas_research/
+!backend/packages/eiqas-research/eiqas_research/worker.py
+!docker/
+!docker/analysis/
+!docker/analysis/requirements.lock
+
+!backend/packages/eiqas-research/eiqas_research/ocr_cli.py

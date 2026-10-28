@@ -21,6 +21,7 @@ class ResearchCreate(Contract):
 class Method(Contract):
     name: Text
     rationale: Text
+    operation: Literal["aggregate", "growth", "structure", "contribution", "correlation", "cost_benefit", "sensitivity", "python", "evidence_review"]
 
 
 class Plan(Contract):
@@ -47,3 +48,13 @@ class StageUpdate(Contract):
 class ScopeUpdate(Contract):
     answerable: list[Text] = Field(default_factory=list, max_length=100)
     gaps: list[Text] = Field(default_factory=list, max_length=100)
+
+
+class ObservationCorrection(Contract):
+    value: Text
+    unit: Text
+    reason: Text
+    subject: Text | None = None
+    period: Text | None = None
+    metric: Text | None = None
+    qualifier: Literal["exact", "about", "more_than", "less_than", "range"] | None = None

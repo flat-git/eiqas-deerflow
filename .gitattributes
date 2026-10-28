@@ -41,3 +41,6 @@ Makefile text eol=lf
 *.mov binary
 *.woff binary
 *.woff2 binary
+
+# Frozen upstream export assets keep their original bytes for SHA-256 checks.
+backend/packages/eiqas-research/eiqas_research/assets/** -text

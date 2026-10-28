@@ -78,6 +78,15 @@ backend/sandbox/
 !frontend/README.md
 !backend/README.md
 
+# EIQAS offline chart assets are required by the Python extension.
+!backend/packages/eiqas-research/eiqas_research/assets/
+!backend/packages/eiqas-research/eiqas_research/assets/**
+.eiqas/
+.env*
+config.yaml
+extensions_config.json
+!**/.env.example
+
 # Extension manager snapshots must enter the backend builder intact. A Python
 # package may require README metadata, native modules, or package assets that
 # the general image-context exclusions above intentionally omit elsewhere.

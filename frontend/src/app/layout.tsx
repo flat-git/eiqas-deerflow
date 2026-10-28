@@ -6,8 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { DEFAULT_LOCALE } from "@/core/i18n/locale";
 
 export const metadata: Metadata = {
-  title: "DeerFlow",
-  description: "A LangChain-based framework for building super agents.",
+  title: "EIQAS · 定量研究工作台",
+  description: "围绕问题组织，以真实定量分析为基础的商业研究工作台。",
 };
 
 export default function RootLayout({

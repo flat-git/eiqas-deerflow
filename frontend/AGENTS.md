@@ -190,3 +190,5 @@ mutation permissions, and cache ownership remain in the existing hooks. Skill di
 metadata; runtime names and full descriptions remain unchanged. Public, custom,
 integration, and legacy sources must stay distinct. Community currently offers
 archive import, not a remote marketplace. Screenshot E2E fixtures are demo data.
+
+EIQAS reader status has three separate concerns: numerical checks, AI-declared fulfillment of the confirmed plan, and human reader feedback. Evidence tables use generic columns, scoped filters and the existing provenance drawer. Reader feedback posts to a result-scoped endpoint and refreshes that same result; it never replaces the currently read report or marks outstanding plan items complete.

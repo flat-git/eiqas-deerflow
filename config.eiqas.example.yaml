@@ -10,6 +10,8 @@ models:
     api_key: $OPENAI_API_KEY
     max_tokens: 8192
     supports_vision: false
+    # Capability flags default to false. Map actual provider thinking on/off
+    # before enabling Pro/Ultra; see docs/model-modes.md (DeepSeek example).
 tool_groups:
   - name: web
   - name: file:read
@@ -23,7 +25,7 @@ tools:
     max_results: 5
   - name: web_fetch
     group: web
-    use: deerflow.community.jina_ai.tools:web_fetch_tool
+    use: eiqas_research.tools:web_fetch_public
   - name: ls
     group: file:read
     use: deerflow.sandbox.tools:ls_tool
@@ -42,16 +44,54 @@ tools:
   - name: eiqas_read_research
     group: research
     use: eiqas_research.tools:eiqas_read_research
+  - name: eiqas_read_records
+    group: research
+    use: eiqas_research.tools:eiqas_read_records
   - name: eiqas_save_plan
     group: research
     use: eiqas_research.tools:eiqas_save_plan
   - name: eiqas_update_scope
     group: research
     use: eiqas_research.tools:eiqas_update_scope
+  - name: eiqas_acquire_source
+    group: research
+    use: eiqas_research.tools:eiqas_acquire_source
+  - name: eiqas_parse_source
+    group: research
+    use: eiqas_research.tools:eiqas_parse_source
+  - name: eiqas_inspect_extraction
+    group: research
+    use: eiqas_research.tools:eiqas_inspect_extraction
+  - name: eiqas_add_observations
+    group: research
+    use: eiqas_research.tools:eiqas_add_observations
+  - name: eiqas_withdraw_observation
+    group: research
+    use: eiqas_research.tools:eiqas_withdraw_observation
+  - name: eiqas_create_dataset
+    group: research
+    use: eiqas_research.tools:eiqas_create_dataset
+  - name: eiqas_execute
+    group: research
+    use: eiqas_research.tools:eiqas_execute
+  - name: eiqas_save_evidence_table
+    group: eiqas
+    use: eiqas_research.tools:eiqas_save_evidence_table
+  - name: eiqas_submit_result
+    group: research
+    use: eiqas_research.tools:eiqas_submit_result
+  - name: eiqas_read_result
+    group: research
+    use: eiqas_research.tools:eiqas_read_result
 sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
   image: eiqas-analysis:0.1.0-dev
   container_prefix: eiqas-sandbox
+  runtime: docker
+  mounts:
+    - host_path: $EIQAS_OCR_CACHE_PATH
+      container_path: /opt/eiqas-cache
+      read_only: false
 database:
   backend: sqlite
   sqlite_dir: .deer-flow/data

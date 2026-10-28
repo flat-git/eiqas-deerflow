@@ -22,7 +22,9 @@ def active_service() -> ResearchService:
 
 
 def thread_id(runtime) -> str:
-    return runtime.config.get("configurable", {}).get("thread_id", "")
+    config = getattr(runtime, "config", None) or {}
+    context = getattr(runtime, "context", None) or {}
+    return config.get("configurable", {}).get("thread_id") or context.get("thread_id", "")
 
 
 class ResearchContext(AgentMiddleware):
@@ -37,7 +39,14 @@ class ResearchContext(AgentMiddleware):
                 "conflicting definitions, uncertain OCR or material objective/method changes. "
                 "Never turn disclosure counts or business background metrics into an AI ability score. "
                 "Only actual checked calculations support verified quantitative conclusions. "
-                "Keep execution state, answerable scope and missing evidence separate."
+                "Register literal original numbers and original units; do not preconvert or round candidates. Dataset freezing performs supported unit normalization. "
+                "Keep execution state, answerable scope and missing evidence separate. "
+                "Before delivery review every method and output of the current confirmed plan. Save located evidence tables for substantive comparisons, definitions and gaps; "
+                "submit their IDs and explicit plan_coverage mapped by zero-based method/output indices to actual runs/tables/findings. "
+                "Declare partial, blocked or conditional non-applicability with reasons when work is missing. Never claim completion from chart count or math checks alone. "
+                "Lead the report with answers to the approved research question. Background finance or other easy metrics must not replace the primary topic. "
+                "Use only method-supported parameters; structure means shares of the selected metric across subjects, not metric/revenue intensity. "
+                "Reader feedback is human-owned; do not claim reader acceptance. If asked to revise, inspect the feedback and plan before adding analysis."
             )
             original = request.system_message.content if request.system_message else ""
             content = original + instruction if isinstance(original, str) else [*original, {"type": "text", "text": instruction}]
@@ -53,6 +62,10 @@ class ResearchRuntime:
     async def start(self, deps):
         global _active
         self.service = await asyncio.to_thread(ResearchService, self.root)
+        from .analysis import AnalysisService
+        from .evidence import EvidenceService
+
+        await asyncio.to_thread(lambda: AnalysisService(EvidenceService(self.service)).recover_interrupted())
         _active = self.service
 
     async def stop(self):

@@ -1,0 +1,65 @@
+name: eiqas
+services:
+  nginx:
+    image: nginx:1.28.0-alpine
+    ports:
+      - "127.0.0.1:${EIQAS_PORT:-2026}:2026"
+    volumes:
+      - ./docker/eiqas/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - gateway
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
+    environment:
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Run local setup first}
+      DEER_FLOW_INTERNAL_GATEWAY_BASE_URL: http://gateway:8001
+    restart: unless-stopped
+  gateway:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app/backend
+    command: ["uv", "run", "--no-sync", "uvicorn", "app.gateway.app:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
+    env_file: .env
+    environment:
+      DEER_FLOW_PROJECT_ROOT: /app
+      DEER_FLOW_HOME: /app/backend/.deer-flow
+      DEER_FLOW_CONFIG_PATH: /app/backend/config.yaml
+      DEER_FLOW_EXTENSIONS_CONFIG_PATH: /app/backend/extensions_config.json
+      DEER_FLOW_SKILLS_PATH: /app/skills
+      EIQAS_OCR_CACHE_PATH: ${EIQAS_OCR_CACHE_PATH:?Run scripts/eiqas_setup.py}
+      DEER_FLOW_HOST_BASE_DIR: ${EIQAS_HOST_STATE:?Run scripts/eiqas_setup.py}
+      DEER_FLOW_SANDBOX_HOST: host.docker.internal
+      DEER_FLOW_SANDBOX_RUNTIME: docker
+      DEER_FLOW_DATE_TIMEZONE: Asia/Shanghai
+      NO_PROXY: localhost,127.0.0.1,::1,gateway,frontend,host.docker.internal
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - ./.eiqas/extensions_config.json:/app/backend/extensions_config.json
+      - ./skills:/app/skills:ro
+      - ./.deer-flow:/app/backend/.deer-flow
+      - ${DEER_FLOW_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health/ready', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+    restart: unless-stopped
+  analysis-image:
+    profiles: [build]
+    image: eiqas-analysis:0.1.0-dev
+    build:
+      context: .
+      dockerfile: docker/analysis/Dockerfile
+    volumes:
+      - ocr-cache:/opt/eiqas-cache
+volumes:
+  ocr-cache:
+    name: eiqas-ocr-cache
