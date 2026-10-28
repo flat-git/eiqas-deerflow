@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 from langchain.tools import ToolRuntime, tool
 
 from .analysis import AnalysisService
+from .delivery import EvidenceTableDraft, EvidenceTableService, ReviewService
 from .evidence import EvidenceService
 from .models import Plan
 from .plugin import active_service, thread_id
@@ -30,7 +31,7 @@ def eiqas_read_research(runtime: ToolRuntime) -> dict:
 
 
 @tool
-def eiqas_read_records(kind: Literal["source", "extraction", "observation", "dataset", "run", "result"], runtime: ToolRuntime, record_id: str = "", offset: int = 0, limit: int = 25) -> dict:
+def eiqas_read_records(kind: Literal["source", "extraction", "observation", "dataset", "run", "result", "evidence_table"], runtime: ToolRuntime, record_id: str = "", offset: int = 0, limit: int = 25) -> dict:
     """Recover current-thread saved records and IDs, including after refresh or context compaction. Empty record_id lists bounded summaries.
     A record_id reads source/observation detail, extraction metadata (use inspect_extraction for blocks), or a page of frozen dataset/run result rows.
     To edit a result read_result instead. No cross-thread access or filesystem traversal.
@@ -40,10 +41,33 @@ def eiqas_read_records(kind: Literal["source", "extraction", "observation", "dat
     offset, limit = max(0, offset), max(1, min(100, limit))
 
     def summary(record):
-        keys = ["id", "title", "source_id", "extraction_id", "dataset_id", "run_id", "status", "reason", "sha256", "input_hash", "created_at", "subject", "period", "metric", "value", "unit", "flags", "withdrawal"]
+        keys = [
+            "id",
+            "title",
+            "source_id",
+            "extraction_id",
+            "dataset_id",
+            "run_id",
+            "status",
+            "reason",
+            "sha256",
+            "input_hash",
+            "created_at",
+            "subject",
+            "period",
+            "metric",
+            "value",
+            "unit",
+            "flags",
+            "withdrawal",
+            "content_hash",
+            "plan_hash",
+        ]
         row = {key: record[key] for key in keys if key in record}
         if kind == "extraction":
             row.update(engine=record["result"].get("engine"), page_count=record["result"].get("page_count"), block_count=len(record["result"]["blocks"]))
+        if kind == "evidence_table":
+            row.update(columns=record["columns"], row_count=len(record["rows"]))
         return row
 
     if not record_id:
@@ -61,6 +85,9 @@ def eiqas_read_records(kind: Literal["source", "extraction", "observation", "dat
             ids = {row["observation_id"] for row in result["rows"]}
             result["observations"] = [obs for obs in record["observations"] if obs["id"] in ids]
         return result
+    if kind == "evidence_table":
+        rows = [{**row, "evidence": [{key: value for key, value in ref.items() if key != "locator"} for ref in row["evidence"]]} for row in record["rows"][offset : offset + limit]]
+        return {**summary(record), "rows": rows, "next_offset": offset + limit if offset + limit < len(record["rows"]) else None}
     if kind == "result":
         return {**summary(record), "reader_url": f"/research/{service.get(rid)['thread_id']}/results/{record['id']}"}
     return record
@@ -271,14 +298,42 @@ async def eiqas_execute(dataset_id: str, method: str, parameters: dict, runtime:
 
 
 @tool
+def eiqas_save_evidence_table(table: EvidenceTableDraft, runtime: ToolRuntime) -> dict:
+    """Save a generic located evidence table for the confirmed plan. Columns: key,label,filterable(optional). Each row: values matching all column keys,
+    kind(fact/company_reported/inference/unknown), explanation, evidence[{source_id,extraction_id,locator_key,quote,explanation}].
+    Quotes must be exact original text. Supported rows require evidence; unknown rows explicitly state the gap. Preserve definitions, periods,
+    qualifiers and attribution; no disclosure-count capability scores. Values are text, not automatically verified computed numbers.
+    Use several focused tables rather than a giant tool call; submit_result references their IDs. Tables do not themselves prove plan fulfillment.
+    """
+    service, rid = current(runtime)
+    saved = EvidenceTableService(EvidenceService(service)).save(rid, table.model_dump() if isinstance(table, EvidenceTableDraft) else table)
+    return {key: saved[key] for key in ["id", "title", "plan_hash", "content_hash"]} | {"row_count": len(saved["rows"])}
+
+
+@tool
 def eiqas_submit_result(report: ReportDraft, runtime: ToolRuntime) -> dict:
     """Submit findings/charts bound to one checked actual run. Key numeric cells are row/column references, never invented values. Qualitative evidence uses
-    exact source/extraction/locator/quote. Return the independent reader URL; conversation edits create a new result.
+    exact source/extraction/locator/quote. Save evidence tables separately and supply table_ids.
+    plan_coverage: {plan_hash,items:[{kind:method|output,index:ZERO_BASED,status:completed|partial|blocked|not_applicable,explanation,
+    run_ids:[],table_ids:[],finding_indices:[],plan_ref:false}]}. Address every current approved method/output. Missing items stay not_addressed.
+    Completed computational methods need actual corresponding runs (or custom Python); artifacts support declarations but do not prove semantic fulfillment.
+    Primary findings answer the approved question; easy background calculations cannot replace it. State missing or conditional work honestly.
+    Reader acceptance is human-only and separate from passed number checks. Return the reader URL; conversation edits create a new result.
     """
     service, rid = current(runtime)
     result = ReportService(EvidenceService(service)).submit(rid, report.model_dump())
     research = service.get(rid)
-    return {"id": result["id"], "run_id": result["run_id"], "status": result["run"]["status"], "reader_url": f"/research/{research['thread_id']}/results/{result['id']}", "scope": result["scope"], "limitations": result["limitations"]}
+    return {
+        "id": result["id"],
+        "run_id": result["run_id"],
+        "calculation_status": result["run"]["status"],
+        "plan_fulfillment": result["coverage"]["status"],
+        "reader_review": "pending",
+        "unresolved_items": [{"kind": item["kind"], "index": item["index"], "name": item["name"], "status": item["status"]} for item in result["coverage"]["items"] if item["status"] not in {"completed", "not_applicable"}],
+        "reader_url": f"/research/{research['thread_id']}/results/{result['id']}",
+        "scope": result["scope"],
+        "limitations": result["limitations"],
+    }
 
 
 @tool
@@ -286,10 +341,12 @@ def eiqas_read_result(result_id: str, runtime: ToolRuntime) -> dict:
     """Read a current-thread result for conversation edits. Save revisions with submit_result; recomputation requires execute and creates a new run. Returns draft fields and checked rows."""
     service, rid = current(runtime)
     result = EvidenceService(service).get(rid, "result", result_id)
-    draft = {key: result[key] for key in ReportDraft.model_fields}
+    draft = {key: result[key] for key in ReportDraft.model_fields if key in result}
+    draft.setdefault("table_ids", [])
+    draft.setdefault("plan_coverage", None)
     draft["findings"] = [{key: value for key, value in finding.items() if key in {"text", "kind", "observation_ids", "cells", "evidence"}} for finding in draft["findings"]]
     for finding in draft["findings"]:
         finding["cells"] = [{"row": cell["row"], "column": cell["column"]} for cell in finding["cells"]]
         finding["evidence"] = [{key: value for key, value in ref.items() if key in {"source_id", "extraction_id", "locator_key", "quote", "explanation"}} for ref in finding["evidence"]]
     draft["charts"] = [{key: value for key, value in chart.items() if key != "unit"} for chart in draft["charts"]]
-    return {"draft": draft, "rows": result["run"]["result"]["rows"], "scope": result["scope"], "spec": result["run"]["spec"]}
+    return {"draft": draft, "rows": result["run"]["result"]["rows"], "scope": result["scope"], "spec": result["run"]["spec"], "coverage": result.get("coverage"), "review": ReviewService(EvidenceService(service)).latest(rid, result_id)}

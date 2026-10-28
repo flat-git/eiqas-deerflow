@@ -1156,3 +1156,72 @@
 .eiqas.eiqas-evidence {
   min-width: 0;
 }
+
+/* Numerical validation, plan fulfillment and reader acceptance remain distinct. */
+.eiqas-fulfillment {
+  margin: 18px 0 24px;
+  border-block: 1px solid var(--eiqas-line, #d6ded4);
+  padding: 14px 0;
+}
+.eiqas-fulfillment summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+.eiqas-fulfillment summary span {
+  color: #647567;
+  font-size: 13px;
+}
+.eiqas-plan-item {
+  padding: 16px 0;
+  border-top: 1px solid #dde3d8;
+}
+.eiqas-plan-item .eiqas-kind {
+  margin-left: 12px;
+}
+.eiqas-review-note {
+  padding: 14px 18px;
+  background: #f6ecdc;
+  color: #79562a;
+  border-left: 3px solid #b28645;
+}
+.eiqas-evidence-table {
+  margin: 36px 0;
+  scroll-margin-top: 24px;
+}
+.eiqas-evidence-table .eiqas-table-scroll {
+  max-height: 650px;
+}
+.eiqas-evidence-table td {
+  white-space: normal;
+  min-width: 140px;
+  max-width: 420px;
+  vertical-align: top;
+  line-height: 1.8;
+}
+.eiqas-evidence-table td:last-child {
+  min-width: 210px;
+}
+.eiqas-evidence-table .eiqas-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eiqas-feedback {
+  border-top: 1px solid #d6ded4;
+  padding-top: 24px;
+  margin-top: 40px;
+}
+.eiqas-feedback label {
+  display: grid;
+  gap: 8px;
+}
+.eiqas-feedback textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #cad5c8;
+  border-radius: 8px;
+}

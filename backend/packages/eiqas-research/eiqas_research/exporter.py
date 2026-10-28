@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import html
 import io
@@ -11,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .analysis import AnalysisService
+from .delivery import EvidenceTableService, ReviewService
 from .evidence import EvidenceService
 from .reports import ReportService
 from .service import Conflict, canonical, digest
@@ -25,7 +27,31 @@ EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
     "application/vnd.ms-excel": ".xls",
 }
-KINDS = {"fact": "计算事实", "inference": "分析推断", "company_reported": "机构自报", "unknown": "无法判断"}
+KINDS = {"fact": "据数据与原文", "inference": "分析推断", "company_reported": "机构自报", "unknown": "无法判断"}
+
+COVERAGE = {"not_assessed": "未核对方案", "partial": "方案部分履行", "declared_complete": "AI已申报履行，待读者核对"}
+ITEM_STATUS = {"completed": "已交付", "partial": "部分交付", "blocked": "有缺口", "not_applicable": "条件不适用", "not_addressed": "未回应"}
+REVIEWS = {"pending": "读者待复核", "accepted": "读者已确认", "needs_revision": "读者反馈：需要修订"}
+
+
+def delivery_status(report: dict) -> str:
+    math = "数值检查通过" if report["run"]["status"] == "verified" else "计算部分完成，已通过结果检查"
+    coverage = COVERAGE[report.get("coverage", {}).get("status", "not_assessed")]
+    review = REVIEWS[report.get("review", {}).get("status", "pending")]
+    return f"{math} · {coverage} · {review}"
+
+
+def narrative_tables(report: dict) -> list[dict]:
+    return report.get("tables", [])
+
+
+def table_csv(table: dict) -> bytes:
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow([*[column["label"] for column in table["columns"]], "判断性质", "解释", "出处与定位"])
+    for row in table["rows"]:
+        writer.writerow([*[row["values"][column["key"]] for column in table["columns"]], KINDS[row["kind"]], row["explanation"], "\n".join(f"{ref['source_id']} · {location(ref['locator'])}：{ref['quote']}" for ref in row["evidence"])])
+    return ("\ufeff" + output.getvalue()).encode("utf-8")
 
 
 def safe_url(value: str) -> str:
@@ -50,14 +76,42 @@ def location(block: dict) -> str:
 
 
 def markdown(report: dict, packaged: bool) -> str:
-    lines = [f"# {report['title']}", "", report["question"], "", f"运行：`{report['run_id']}`；结果：`{report['id']}`；执行状态：{report['run']['status']}", "", "## 核心结论", "", report["summary"], "", "## 主要发现", ""]
+    lines = [
+        f"# {report['title']}",
+        "",
+        report["plan"]["content"]["question"],
+        "",
+        delivery_status(report),
+        "",
+        report.get("review", {}).get("comment", ""),
+        "",
+        f"运行：`{report['run_id']}`；结果：`{report['id']}`；执行状态：{report['run']['status']}",
+        "",
+        "## 核心结论",
+        "",
+        report["summary"],
+        "",
+        "## 主要发现",
+        "",
+    ]
     for index, finding in enumerate(report["findings"], 1):
         lines.extend([f"{index}. **{KINDS[finding['kind']]}**：{finding['text']}", ""])
         for cell in finding["cells"]:
             lines.extend([f"   结果表第 {cell['row'] + 1} 行 `{cell['column']}`：{cell['value']} {cell['unit']}；依据：{', '.join(cell['observation_ids'])}", ""])
         for reference in finding.get("evidence", []):
             lines.extend([f"   出处 {reference['source_id']} · {location(reference['locator'])}：{reference['quote']}", f"   解释：{reference['explanation']}", ""])
-    lines.extend(["## 图表与比较分析", ""])
+    lines.extend(["## 方案履行核对", "", COVERAGE[report.get("coverage", {}).get("status", "not_assessed")], "", "履行情况由 AI 申报，引用经过程序核对；是否回答研究问题仍需读者判断。", ""])
+    for item in report.get("coverage", {}).get("items", []):
+        lines.extend(
+            [f"- {item['name']}：{ITEM_STATUS[item['status']]}。{item['explanation']}", f"  计算 {', '.join(item['run_ids']) or '—'}；证据表 {', '.join(item['table_ids']) or '—'}；发现 {[i + 1 for i in item['finding_indices']]}", ""]
+        )
+    for table in narrative_tables(report):
+        lines.extend([f"## {table['title']}", ""])
+        for index, row in enumerate(table["rows"], 1):
+            lines.extend([f"### {index}. {KINDS[row['kind']]}", "", *[f"- {column['label']}：{row['values'][column['key']]}" for column in table["columns"]], "", row["explanation"], ""])
+            for ref in row["evidence"]:
+                lines.extend([f"出处 {ref['source_id']} · {location(ref['locator'])}：{ref['quote']}", ref["explanation"], ""])
+    lines.extend(["## 定量结果与图表", ""])
     for chart in report["charts"]:
         lines.extend([f"### {chart['title']}", "", chart["explanation"], "", f"图表：{chart['type']}；横轴 {chart['x']}；纵轴 {chart['y']}（{chart['unit']}）。交互图见同一成果的 HTML。", ""])
     for title, values in [("管理启示", report["implications"]), ("可判断范围", report["scope"]["answerable"]), ("判断边界与缺口", report["limitations"])]:
@@ -123,6 +177,25 @@ def render_html(report: dict, packaged: bool) -> str:
             f"<p>{esc(location(obs['locator']))} · {'OCR，已人工核对' if obs['locator'].get('ocr') else '原生文本'} · {esc(obs['qualifier'])}</p>"
             f'<a href="{esc(link)}" target=_blank rel=noopener>{esc(source["title"])} · 打开原件</a><pre>{esc(canonical(obs.get("corrections", [])))}</pre></details>'
         )
+    coverage = report.get("coverage", {})
+    coverage_html = f"<h2>方案履行核对</h2><p>{esc(COVERAGE[coverage.get('status', 'not_assessed')])}</p><p class=muted>履行情况由 AI 申报，引用经过程序核对；是否回答研究问题仍需读者判断。</p>"
+    for item in coverage.get("items", []):
+        coverage_html += (
+            f"<details><summary>{esc(item['name'])} · {esc(ITEM_STATUS[item['status']])}</summary><p>{esc(item['explanation'])}</p>"
+            f"<p class=muted>计算 {esc(', '.join(item['run_ids']) or '—')}；证据表 {esc(', '.join(item['table_ids']) or '—')}；发现 {esc([i + 1 for i in item['finding_indices']])}</p></details>"
+        )
+    tables_html = []
+    for table in narrative_tables(report):
+        columns = "".join(f"<th>{esc(column['label'])}</th>" for column in table["columns"])
+        body = []
+        for row in table["rows"]:
+            values = "".join(f"<td>{esc(row['values'][column['key']])}</td>" for column in table["columns"])
+            refs = "".join(f'<p>{esc(ref["quote"])}<br><a href="#source-{esc(ref["source_id"])}">{esc(location(ref["locator"]))} · 查看出处</a><br>{esc(ref["explanation"])}</p>' for ref in row["evidence"])
+            body.append(f"<tr>{values}<td>{esc(KINDS[row['kind']])}<p>{esc(row['explanation'])}</p></td><td><details><summary>查看表格依据</summary>{refs or '暂无可支持该判断的证据。'}</details></td></tr>")
+        tables_html.append(
+            f'<section class=evidence-table data-table-id="{esc(table["id"])}"><h2>{esc(table["title"])}</h2><div class=table-scroll><table>'
+            f"<thead><tr>{columns}<th>判断与解释</th><th>出处</th></tr></thead><tbody>{''.join(body)}</tbody></table></div></section>"
+        )
     charts = "".join(
         f'<article class=chart-card><span class=eyebrow>图 {i + 1:02}</span><h3>{esc(chart["title"])}</h3><p>{esc(chart["explanation"])}</p><div class=chart id="chart-{i}" role=img aria-label="{esc(chart["title"])}"></div></article>'
         for i, chart in enumerate(report["charts"])
@@ -131,9 +204,11 @@ def render_html(report: dict, packaged: bool) -> str:
     template = (ASSETS / "report.html").read_text(encoding="utf-8")
     replacements = {
         "TITLE": esc(report["title"]),
-        "QUESTION": esc(report["question"]),
+        "QUESTION": esc(report["plan"]["content"]["question"]),
         "SUMMARY": esc(report["summary"]),
-        "IDENTITY": esc(f"{report['run']['status']} · 运行 {report['run_id']} · 成果 {report['id']}"),
+        "IDENTITY": esc(delivery_status(report) + " · " + report.get("review", {}).get("comment", "") + f" · 运行 {report['run_id']} · 成果 {report['id']}"),
+        "COVERAGE": coverage_html,
+        "TABLES": "".join(tables_html),
         "FINDINGS": "".join(findings),
         "CHARTS": charts,
         "IMPLICATIONS": items(report["implications"]),
@@ -170,21 +245,40 @@ class ExportService:
         for name, sha in manifest["files"].items():
             if hashlib.sha256((ASSETS / name).read_bytes()).hexdigest() != sha:
                 raise Conflict(f"导出依赖 {name} 完整性检查失败")
-        directory = AnalysisService(self.evidence).run_directory(rid, run["id"])
+        report = {**report, "review": ReviewService(self.evidence).latest(rid, report_id)}
         files = {}
-        for name, sha in run["artifact_hashes"].items():
-            if name not in {"input.json", "script.py", "execution.log", "result.json", "result.csv", "analysis.py", "check.py"}:
-                raise Conflict("运行包含未知交付材料")
-            data = (directory / name).read_bytes()
-            if hashlib.sha256(data).hexdigest() != sha:
-                raise Conflict(f"运行材料 {name} 完整性不一致")
-            files[f"runs/{run['id']}/{name}"] = data
+        datasets = {dataset["id"]: dataset}
+        for snapshot in [report["run"], *report.get("auxiliary_runs", [])]:
+            actual = self.evidence.get(rid, "run", snapshot["id"])
+            frozen = reports.verify_run(rid, actual)
+            if digest(snapshot) != digest(actual):
+                raise Conflict("引用运行与成果冻结快照不一致")
+            datasets[frozen["id"]] = frozen
+            directory = AnalysisService(self.evidence).run_directory(rid, actual["id"])
+            for name, sha in actual["artifact_hashes"].items():
+                if name not in {"input.json", "script.py", "execution.log", "result.json", "result.csv", "analysis.py", "check.py"}:
+                    raise Conflict("运行包含未知交付材料")
+                data = (directory / name).read_bytes()
+                if hashlib.sha256(data).hexdigest() != sha:
+                    raise Conflict(f"运行材料 {name} 完整性不一致")
+                files[f"runs/{actual['id']}/{name}"] = data
+        for snapshot in report.get("auxiliary_datasets", []):
+            if snapshot["id"] not in datasets or digest(snapshot) != digest(datasets[snapshot["id"]]):
+                raise Conflict("引用数据集与冻结快照不一致")
+        for frozen in datasets.values():
+            files[f"datasets/{frozen['id']}.json"] = canonical(frozen).encode()
+        for table in narrative_tables(report):
+            actual = EvidenceTableService(self.evidence).verify(rid, table["id"], report["plan"]["hash"])
+            if digest(actual) != digest(table):
+                raise Conflict("证据表与成果冻结快照不一致")
+            files[f"tables/{table['id']}.csv"] = table_csv(table)
+            files[f"tables/{table['id']}.json"] = canonical(table).encode()
         for source in report["sources"]:
             data = self.evidence.original(rid, source["id"]).read_bytes()
             if hashlib.sha256(data).hexdigest() != source["sha256"]:
                 raise Conflict("来源与成果快照不一致")
             files[source_name(source)] = data
-        extractions = {obs["extraction_id"]: obs["extraction_hash"] for obs in dataset["observations"]}
+        extractions = {obs["extraction_id"]: obs["extraction_hash"] for frozen in datasets.values() for obs in frozen["observations"]}
         extractions.update({row["id"]: row["sha256"] for row in report.get("extractions", [])})
         for eid, sha in extractions.items():
             row = self.evidence.get(rid, "extraction", eid)

@@ -134,11 +134,33 @@ def _custom_analysis(dataset: dict, parameters: dict) -> dict:
     }
 
 
+def validate_spec(spec: dict) -> None:
+    allowed = {
+        "aggregate": ({"group_by"}, set()),
+        "growth": ({"metric"}, {"metric"}),
+        "structure": ({"metric", "period"}, {"metric"}),
+        "contribution": ({"metric", "from", "to"}, {"metric", "from", "to"}),
+        "correlation": ({"x", "y"}, {"x", "y"}),
+        "cost_benefit": ({"cost_metric", "benefit_metric", "discount_rate"}, set()),
+        "sensitivity": ({"cost_metric", "benefit_metric", "discount_rates"}, set()),
+        "python": ({"code", "check_code", "arguments"}, {"code", "check_code"}),
+    }
+    method, params = spec.get("method"), spec.get("parameters", {})
+    if method not in allowed or not isinstance(params, dict):
+        raise ValueError("未注册的方法或无效参数对象")
+    keys, required = allowed[method]
+    if set(params) - keys:
+        raise ValueError(f"{method} 不支持参数 {', '.join(sorted(set(params) - keys))}，不会忽略后执行另一种计算")
+    if required - set(params):
+        raise ValueError(f"{method} 缺少参数 {', '.join(sorted(required - set(params)))}")
+
+
 def analyze(dataset: dict, spec: dict) -> dict:
     """Perform actual calculations, plus independent Decimal/numpy checks."""
     import duckdb
     import pandas as pd
 
+    validate_spec(spec)
     frame = _frame(dataset)
     method, params = spec["method"], spec.get("parameters", {})
     if method == "python":

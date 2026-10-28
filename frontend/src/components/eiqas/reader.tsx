@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { eiqasAPI } from "@/core/eiqas/api";
+import { eiqasAPI, writeJSON } from "@/core/eiqas/api";
 import type { Command, Report, Research } from "@/core/eiqas/types";
 
 import { ReportView } from "./report-view";
@@ -41,6 +41,7 @@ export function ResearchReader({
         signal,
       }),
     enabled: Boolean(rid),
+    refetchInterval: 10000,
   });
   const latest = useQuery({
     queryKey: ["eiqas", rid, "results"],
@@ -110,7 +111,18 @@ export function ResearchReader({
             </div>
           )}
           {report ? (
-            <ReportView report={report} onRecompute={recompute} />
+            <ReportView
+              key={report.id}
+              report={report}
+              onRecompute={recompute}
+              onReview={async (status, comment) => {
+                await eiqasAPI(
+                  `/research/${rid}/results/${reportId}/review`,
+                  writeJSON("POST", { status, comment }),
+                );
+                await record.refetch();
+              }}
+            />
           ) : (
             !record.error && <p>正在载入研究成果…</p>
           )}

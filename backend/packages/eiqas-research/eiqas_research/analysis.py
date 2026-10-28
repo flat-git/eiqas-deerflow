@@ -25,6 +25,7 @@ class AnalysisService:
 
     def start_run(self, rid: str, dataset_id: str, spec: dict, *, native_run_id: str | None) -> dict:
         plan = self.evidence.research.require_confirmed(rid)
+        worker.validate_spec(spec)
         if spec.get("method") not in {method["operation"] for method in plan["content"]["methods"]}:
             raise Conflict("计算方法不在已确认方案中，请更新方法后重新确认")
         dataset = self.evidence.get(rid, "dataset", dataset_id)

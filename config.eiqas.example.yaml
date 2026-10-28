@@ -10,6 +10,8 @@ models:
     api_key: $OPENAI_API_KEY
     max_tokens: 8192
     supports_vision: false
+    # Capability flags default to false. Map actual provider thinking on/off
+    # before enabling Pro/Ultra; see docs/model-modes.md (DeepSeek example).
 tool_groups:
   - name: web
   - name: file:read
@@ -72,6 +74,9 @@ tools:
   - name: eiqas_execute
     group: research
     use: eiqas_research.tools:eiqas_execute
+  - name: eiqas_save_evidence_table
+    group: eiqas
+    use: eiqas_research.tools:eiqas_save_evidence_table
   - name: eiqas_submit_result
     group: research
     use: eiqas_research.tools:eiqas_submit_result

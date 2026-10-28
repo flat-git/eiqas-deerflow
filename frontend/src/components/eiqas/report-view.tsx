@@ -7,6 +7,12 @@ import { downloadExport, eiqasURL } from "@/core/eiqas/api";
 import { formatNumber, methodNames, stateNames } from "@/core/eiqas/chart-data";
 import type { ChartSpec, DataRow, Finding, Report } from "@/core/eiqas/types";
 
+import {
+  EvidenceTableView,
+  PlanFulfillment,
+  ReaderFeedback,
+  reviewLabels,
+} from "./delivery-context";
 import { EvidencePanel, type EvidenceSelection } from "./evidence-panel";
 import { ResultChart } from "./result-chart";
 
@@ -21,9 +27,14 @@ export function ReportView({
   report,
   compact = false,
   onRecompute,
+  onReview,
 }: {
   report: Report;
   compact?: boolean;
+  onReview?: (
+    status: "accepted" | "needs_revision",
+    comment: string,
+  ) => Promise<void>;
   onRecompute?: (parameters: Record<string, unknown>) => void;
 }) {
   const [selection, setSelection] = useState<EvidenceSelection | null>(null);
@@ -92,7 +103,7 @@ export function ReportView({
         <div>
           <span className="eiqas-eyebrow">RESEARCH FINDINGS</span>
           <h1>{report.title}</h1>
-          <p className="eiqas-muted">{report.question}</p>
+          <p className="eiqas-muted">{report.plan.content.question}</p>
         </div>
         {!compact && (
           <div className="eiqas-export-menu">
@@ -119,7 +130,18 @@ export function ReportView({
       </div>
       <div className="eiqas-report-meta">
         <span className="eiqas-badge">
-          {stateNames[report.run.status] ?? report.run.status}
+          {report.run.status === "verified"
+            ? "数值检查通过"
+            : (stateNames[report.run.status] ?? report.run.status)}
+        </span>
+        <span
+          className={
+            report.review?.status === "needs_revision"
+              ? "eiqas-caution"
+              : "eiqas-muted"
+          }
+        >
+          {reviewLabels[report.review?.status ?? "pending"]}
         </span>
         <span>{new Date(report.created_at).toLocaleString("zh-CN")}</span>
         <span>{methodNames[report.run.spec.method] ?? "定制分析"}</span>
@@ -129,6 +151,16 @@ export function ReportView({
           </span>
         )}
       </div>
+      {report.review?.comment && (
+        <p className="eiqas-review-note">{report.review.comment}</p>
+      )}
+      <PlanFulfillment
+        report={report}
+        inspect={(index) => {
+          const finding = report.findings[index];
+          if (finding) inspectFinding(finding);
+        }}
+      />
       <section className="eiqas-conclusion">
         <span className="eiqas-eyebrow">核心结论</span>
         <p>{report.summary}</p>
@@ -175,6 +207,14 @@ export function ReportView({
             : `展开其余 ${report.findings.length - 3} 条发现`}
         </button>
       )}
+      {!compact &&
+        report.tables?.map((evidenceTable) => (
+          <EvidenceTableView
+            key={evidenceTable.id}
+            table={evidenceTable}
+            inspect={setSelection}
+          />
+        ))}
       <div className="eiqas-section-title">
         <div>
           <span className="eiqas-eyebrow">NUMBERS IN CONTEXT</span>
@@ -393,6 +433,9 @@ export function ReportView({
             </a>
           </details>
         </>
+      )}
+      {!compact && onReview && (
+        <ReaderFeedback report={report} onSubmit={onReview} />
       )}
       <EvidencePanel
         rid={report.research_id}

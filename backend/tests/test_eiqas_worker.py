@@ -20,6 +20,11 @@ def test_actual_aggregate_and_independent_check(revenue):
     assert result["status"] == "verified"
 
 
+def test_unknown_structure_denominator_is_rejected_instead_of_silently_ignored(revenue):
+    with pytest.raises(ValueError, match="total_metric"):
+        analyze(revenue, {"method": "structure", "parameters": {"metric": "收入", "period": "2025", "total_metric": "研发费用"}})
+
+
 def test_growth_and_zero_denominator(revenue):
     result = analyze(revenue, {"method": "growth", "parameters": {"metric": "收入"}})
     assert [row["growth"] for row in result["rows"]] == pytest.approx([0.1, -0.2])

@@ -31,6 +31,10 @@ for (const width of [1366, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(pathToFileURL(receipt.exports.html).href);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("合成");
+    await expect(
+      page.getByRole("heading", { name: "合成输入口径与依据" }),
+    ).toBeVisible();
+    await expect(page.locator(".status")).toContainText("读者待复核");
     await expect(page.locator("#row-count")).toHaveText("2 / 2 行");
     const canvases = page.locator(".chart canvas");
     expect(await canvases.count()).toBeGreaterThan(0);

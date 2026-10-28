@@ -159,3 +159,65 @@ test("secondary limitations expand without losing the primary judgment boundarie
   );
   expect(screen.getByText("判断边界7")).toBeTruthy();
 });
+
+test("passed numbers do not obscure a rejected reader review or unassessed plan", () => {
+  const content = report();
+  content.review = {
+    status: "needs_revision",
+    comment: "结果没有回答研究问题",
+  };
+  render(<ReportView report={content} />);
+  expect(screen.getByText("数值检查通过")).toBeTruthy();
+  expect(screen.getByText("需要修订")).toBeTruthy();
+  expect(screen.getByText("未核对方案")).toBeTruthy();
+  expect(screen.getByText("结果没有回答研究问题")).toBeTruthy();
+});
+
+test("generic evidence tables filter declared columns and open located evidence", () => {
+  const content = report();
+  content.tables = [
+    {
+      id: "evidence-one",
+      title: "指标定义与可比性",
+      columns: [
+        { key: "subject", label: "主体", filterable: true },
+        { key: "definition", label: "口径" },
+      ],
+      rows: [
+        {
+          values: { subject: "甲", definition: "同一统计范围" },
+          kind: "company_reported",
+          explanation: "机构披露",
+          evidence: [],
+        },
+        {
+          values: { subject: "乙", definition: "无法统一口径" },
+          kind: "unknown",
+          explanation: "缺少分母",
+          evidence: [],
+        },
+      ],
+    },
+  ];
+  render(<ReportView report={content} />);
+  fireEvent.change(screen.getByLabelText("指标定义与可比性 · 主体"), {
+    target: { value: "乙" },
+  });
+  expect(screen.queryByText("同一统计范围")).toBeNull();
+  expect(screen.getByText("无法统一口径")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "查看表格依据" }));
+  expect(screen.getByRole("dialog").textContent).toContain("指标定义与可比性");
+});
+
+test("reader feedback calls the user action without changing computational status", async () => {
+  const onReview = rs.fn().mockResolvedValue(undefined);
+  render(<ReportView report={report()} onReview={onReview} />);
+  fireEvent.change(screen.getByLabelText("复核意见"), {
+    target: { value: "需要补齐原方案的趋势分析" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "需要修订" }));
+  expect(onReview).toHaveBeenCalledWith(
+    "needs_revision",
+    "需要补齐原方案的趋势分析",
+  );
+});

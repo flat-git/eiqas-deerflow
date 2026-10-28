@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 
 from eiqas_research.analysis import AnalysisService
+from eiqas_research.delivery import EvidenceTableService
 from eiqas_research.evidence import EvidenceService
 from eiqas_research.exporter import ExportService
 from eiqas_research.models import Plan, ResearchCreate
@@ -160,10 +161,54 @@ def main():
         answerable=["两个合成区域的绝对变化及增长率"],
         gaps=["没有因果识别设计，不能解释差异成因"],
     )
+    table = EvidenceTableService(evidence).save(
+        rid,
+        {
+            "title": "合成输入口径与依据",
+            "columns": [
+                {"key": "subject", "label": "主体", "filterable": True},
+                {"key": "period", "label": "期间"},
+                {"key": "value", "label": "原值（元）"},
+            ],
+            "rows": [
+                {
+                    "values": {"subject": subject, "period": period, "value": value},
+                    "kind": "fact",
+                    "explanation": "明确标注的合成原值；不代表真实业务。",
+                    "evidence": [
+                        {
+                            "source_id": source["id"],
+                            "extraction_id": extraction["id"],
+                            "locator_key": f"row:{i + 2}",
+                            "quote": value,
+                            "explanation": "与合成CSV中的原单元格一致",
+                        }
+                    ],
+                }
+                for i, (subject, period, value) in enumerate(records)
+            ],
+        },
+    )
     result = ReportService(evidence).submit(
         rid,
         {
             "run_id": run["id"],
+            "table_ids": [table["id"]],
+            "plan_coverage": {
+                "plan_hash": plan["hash"],
+                "items": [
+                    {
+                        "kind": kind,
+                        "index": 0,
+                        "status": "completed",
+                        "explanation": "实际增长运算及可定位合成输入已交付；尚无读者确认。",
+                        "run_ids": [run["id"]],
+                        "table_ids": [table["id"]],
+                        "finding_indices": [0, 1],
+                    }
+                    for kind in ["method", "output"]
+                ],
+            },
             "title": "合成收入趋势：区域甲增长更快",
             "summary": "区域甲收入增长25%，区域乙增长15%；差异成因尚不能判断。",
             "findings": [
@@ -218,6 +263,9 @@ def main():
     manifest = json.loads((unpacked / "manifest.json").read_text())
     for name, sha in manifest["files"].items():
         assert hashlib.sha256((unpacked / name).read_bytes()).hexdigest() == sha, name
+    assert f"tables/{table['id']}.csv" in manifest["files"]
+    assert "合成输入口径与依据" in paths["html"].read_text()
+    assert "读者待复核" in paths["html"].read_text()
     replay = execute(unpacked / "runs" / run["id"], "replay.json")
     assert replay["rows"] == output["rows"] and replay["checks"] == output["checks"]
     receipt = {
@@ -230,6 +278,7 @@ def main():
         "exports": {format: str(path) for format, path in paths.items()},
         "checks": {
             "actual_calculation": True,
+            "plan_coverage_and_evidence_table": True,
             "independent_result_values": True,
             "package_checksums": True,
             "zip_replay_rows_and_checks": True,

@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field
 
 from .analysis import AnalysisService
+from .delivery import EvidenceTableService, LocatedEvidence, PlanCoverage, resolve_coverage, resolve_reference
 from .evidence import EvidenceService
 from .models import Contract, Identifier, Text
 from .service import Conflict, digest
@@ -16,14 +17,6 @@ from .service import Conflict, digest
 class Cell(Contract):
     row: int = Field(ge=0)
     column: Text
-
-
-class LocatedEvidence(Contract):
-    source_id: Identifier
-    extraction_id: Identifier
-    locator_key: Text
-    quote: Text
-    explanation: Text
 
 
 class Finding(Contract):
@@ -53,6 +46,8 @@ class ReportDraft(Contract):
     charts: list[Chart] = Field(min_length=1, max_length=12)
     implications: list[Text] = Field(default_factory=list, max_length=20)
     limitations: list[Text] = Field(default_factory=list, max_length=30)
+    table_ids: list[Identifier] = Field(default_factory=list, max_length=20)
+    plan_coverage: PlanCoverage | None = None
 
 
 def field_unit(column: str, row: dict) -> str:
@@ -93,6 +88,9 @@ class ReportService:
         self.evidence = evidence
 
     def verify_run(self, rid: str, run: dict) -> dict:
+        from .worker import validate_spec
+
+        validate_spec(run["spec"])
         if run["status"] not in {"verified", "partial"} or not run.get("verified_at"):
             raise Conflict("只有实际运行并通过检查的结果可以交付")
         if digest(run["result"]) != run["output_hash"]:
@@ -172,6 +170,33 @@ class ReportService:
                 raise Conflict("散点图横轴必须是实际数值")
             charts.append({**chart.model_dump(), "unit": next(iter(units))})
         source_ids = list(dict.fromkeys(obs["source_id"] for obs in observations.values()))
+        if len(set(content.table_ids)) != len(content.table_ids):
+            raise Conflict("交付证据表引用重复")
+        tables = [EvidenceTableService(self.evidence).verify(rid, table_id, research["plan"]["hash"]) for table_id in content.table_ids]
+        for table in tables:
+            for row in table["rows"]:
+                for reference in row["evidence"]:
+                    _resolved, source, extraction = resolve_reference(self.evidence, rid, reference)
+                    additional_sources[source["id"]] = source
+                    located_extractions[extraction["id"]] = extraction
+        verified_runs = {run["id"]: run}
+        datasets = {dataset["id"]: dataset}
+
+        def verify_auxiliary(run_id):
+            if run_id not in verified_runs:
+                auxiliary = self.evidence.get(rid, "run", run_id)
+                if auxiliary["plan_hash"] != research["plan"]["hash"]:
+                    raise Conflict("履行核对引用了其他方案的运行")
+                auxiliary_dataset = self.verify_run(rid, auxiliary)
+                verified_runs[run_id] = auxiliary
+                datasets[auxiliary_dataset["id"]] = auxiliary_dataset
+            return verified_runs[run_id]
+
+        coverage, _declared_runs = resolve_coverage(research, content, tables, verify_auxiliary)
+        for auxiliary_dataset in datasets.values():
+            for observation in auxiliary_dataset["observations"]:
+                if observation["source_id"] not in source_ids:
+                    additional_sources[observation["source_id"]] = self.evidence.get(rid, "source", observation["source_id"])
         sources = [self.evidence.get(rid, "source", sid) for sid in source_ids]
         sources.extend(source for sid, source in additional_sources.items() if sid not in source_ids)
         result = self.evidence.put(
@@ -181,6 +206,10 @@ class ReportService:
                 **content.model_dump(),
                 "findings": findings,
                 "charts": charts,
+                "tables": tables,
+                "coverage": coverage,
+                "auxiliary_runs": [value for key, value in verified_runs.items() if key != run["id"]],
+                "auxiliary_datasets": [value for key, value in datasets.items() if key != dataset["id"]],
                 "run": run,
                 "dataset": dataset,
                 "sources": sources,

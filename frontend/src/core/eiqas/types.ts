@@ -125,6 +125,42 @@ export type Finding = {
   observation_ids: string[];
   evidence: EvidenceReference[];
 };
+export type EvidenceTable = {
+  id: string;
+  title: string;
+  columns: { key: string; label: string; filterable?: boolean }[];
+  rows: {
+    values: Record<string, string>;
+    kind: Finding["kind"];
+    explanation: string;
+    evidence: EvidenceReference[];
+  }[];
+};
+export type ReaderReview = {
+  status: "pending" | "accepted" | "needs_revision";
+  comment: string;
+};
+export type PlanCoverage = {
+  status: "not_assessed" | "partial" | "declared_complete";
+  plan_hash: string;
+  note: string;
+  items: {
+    kind: "method" | "output";
+    index: number;
+    name: string;
+    status:
+      | "completed"
+      | "partial"
+      | "blocked"
+      | "not_applicable"
+      | "not_addressed";
+    explanation: string;
+    run_ids: string[];
+    table_ids: string[];
+    finding_indices: number[];
+    plan_ref: boolean;
+  }[];
+};
 export type Report = {
   id: string;
   research_id: string;
@@ -134,6 +170,9 @@ export type Report = {
   summary: string;
   findings: Finding[];
   charts: ChartSpec[];
+  tables?: EvidenceTable[];
+  coverage?: PlanCoverage;
+  review?: ReaderReview;
   implications: string[];
   limitations: string[];
   run: Run;

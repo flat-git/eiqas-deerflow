@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 
+from .delivery import ReviewRequest, ReviewService
 from .evidence import EvidenceService
 from .models import Confirmation, ObservationCorrection, Plan, QuestionUpdate, ResearchCreate, ScopeUpdate, StageUpdate
 from .service import Conflict, NotFound, ResearchService
@@ -64,6 +65,14 @@ def build_router(service: ResearchService) -> APIRouter:
 
     def evidence():
         return EvidenceService(service)
+
+    @router.post("/research/{rid}/results/{result_id}/review")
+    def review_result(rid: str, result_id: str, body: ReviewRequest):
+        return _call(ReviewService(evidence()).record, rid, result_id, **body.model_dump())
+
+    @router.get("/research/{rid}/results/{result_id}/review")
+    def get_review(rid: str, result_id: str):
+        return _call(ReviewService(evidence()).latest, rid, result_id)
 
     @router.patch("/research/{rid}/observations/{oid}")
     def correct_observation(rid: str, oid: str, body: ObservationCorrection):
@@ -125,14 +134,18 @@ def build_router(service: ResearchService) -> APIRouter:
         media = {"html": "text/html", "md": "text/markdown", "csv": "text/csv", "zip": "application/zip"}
         return FileResponse(path, media_type=media[format], filename=f"eiqas-{report_id}.{format}", headers={"X-Content-Type-Options": "nosniff"})
 
-    collections = {"sources": "source", "extractions": "extraction", "observations": "observation", "datasets": "dataset", "runs": "run", "results": "result"}
+    collections = {"sources": "source", "extractions": "extraction", "observations": "observation", "datasets": "dataset", "runs": "run", "results": "result", "evidence-tables": "evidence_table"}
 
     @router.get("/research/{rid}/records/{collection}")
-    def list_records(rid: str, collection: Literal["sources", "extractions", "observations", "datasets", "runs", "results"]):
-        return _call(evidence().list, rid, collections[collection])
+    def list_records(rid: str, collection: Literal["sources", "extractions", "observations", "datasets", "runs", "results", "evidence-tables"]):
+        e = evidence()
+        records = _call(e.list, rid, collections[collection])
+        return [{**record, "review": ReviewService(e).latest(rid, record["id"])} for record in records] if collection == "results" else records
 
     @router.get("/research/{rid}/records/{collection}/{record_id}")
-    def get_record(rid: str, collection: Literal["sources", "extractions", "observations", "datasets", "runs", "results"], record_id: str):
-        return _call(evidence().get, rid, collections[collection], record_id)
+    def get_record(rid: str, collection: Literal["sources", "extractions", "observations", "datasets", "runs", "results", "evidence-tables"], record_id: str):
+        e = evidence()
+        record = _call(e.get, rid, collections[collection], record_id)
+        return {**record, "review": ReviewService(e).latest(rid, record_id)} if collection == "results" else record
 
     return router
