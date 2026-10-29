@@ -1756,6 +1756,12 @@ export function useThreadStream({
   // Ref to track current thread ID across async callbacks without causing re-renders,
   // and to allow access to the current thread id in onUpdateEvent
   const threadIdRef = useRef<string | null>(threadId ?? null);
+  const activeRunRef = useRef<{ threadId: string; runId: string } | null>(null);
+  const stoppingRef = useRef<{
+    threadId: string | null;
+    promise: Promise<void>;
+  } | null>(null);
+  const [stoppingThreadId, setStoppingThreadId] = useState<string | null>(null);
   const startedRef = useRef(false);
   const pendingUsageBaselineMessageIdsRef = useRef<Set<string>>(new Set());
   const pendingPreparedReplayRef = useRef<PendingPreparedReplayMask | null>(
@@ -1795,6 +1801,7 @@ export function useThreadStream({
   }, [threadId]);
 
   const handleStreamStart = useCallback((_threadId: string, _runId: string) => {
+    activeRunRef.current = { threadId: _threadId, runId: _runId };
     threadIdRef.current = _threadId;
     setOptimisticThreadId((currentOptimisticThreadId) => {
       const currentView = currentViewThreadIdRef.current;
@@ -2040,17 +2047,49 @@ export function useThreadStream({
   const stopThread = useCallback(async () => {
     const stoppedThreadId =
       threadIdRef.current ?? displayThreadId ?? threadId ?? null;
+    if (stoppingRef.current?.threadId === stoppedThreadId) {
+      return stoppingRef.current.promise;
+    }
+    // SDK stop aborts the stream and fires cancel(wait=false) without awaiting
+    // backend cleanup. Snapshot its reconnect id before stop removes that key.
+    let runId =
+      activeRunRef.current?.threadId === stoppedThreadId
+        ? activeRunRef.current.runId
+        : null;
+    if (stoppedThreadId && !isMock) {
+      try {
+        runId = sessionStorage.getItem(`lg:stream:${stoppedThreadId}`) ?? runId;
+      } catch {
+        /* The in-memory identity still covers locally started runs. */
+      }
+    }
     const pendingReplay = pendingPreparedReplayRef.current;
-    await stopThreadAndInvalidateCaches(
+    setStoppingThreadId(stoppedThreadId);
+    const stopping = stopThreadAndInvalidateCaches(
       queryClient,
-      () => thread.stop(),
+      async () => {
+        await thread.stop();
+        if (stoppedThreadId && runId && !isMock) {
+          await getAPIClient().runs.cancel(stoppedThreadId, runId, true);
+        }
+      },
       stoppedThreadId,
       isMock,
     );
-    if (pendingReplay) {
-      setOptimisticMessages([]);
-      setOptimisticThreadId(null);
-      clearPreparedReplayMasks(pendingReplay);
+    const pending = { threadId: stoppedThreadId, promise: stopping };
+    stoppingRef.current = pending;
+    try {
+      await stopping;
+      if (pendingReplay) {
+        setOptimisticMessages([]);
+        setOptimisticThreadId(null);
+        clearPreparedReplayMasks(pendingReplay);
+      }
+    } finally {
+      if (stoppingRef.current === pending) {
+        stoppingRef.current = null;
+        setStoppingThreadId(null);
+      }
     }
   }, [
     clearPreparedReplayMasks,
@@ -2234,6 +2273,9 @@ export function useThreadStream({
       extraContext?: Record<string, unknown>,
       options?: SendMessageOptions,
     ) => {
+      if (stoppingRef.current?.threadId === threadId) {
+        throw new Error("正在停止上一项任务，请等待服务端确认后继续。");
+      }
       if (sendInFlightRef.current) {
         return;
       }
@@ -2862,6 +2904,9 @@ export function useThreadStream({
   // History messages may overlap with thread.messages; thread.messages take precedence
   const mergedThread = {
     ...thread,
+    isLoading:
+      thread.isLoading ||
+      (stoppingThreadId !== null && stoppingThreadId === currentViewThreadId),
     stop: stopThread,
     values: hasVisibleStreamState ? thread.values : EMPTY_THREAD_VALUES,
     messages: mergedMessages,
@@ -2869,6 +2914,8 @@ export function useThreadStream({
 
   return {
     thread: mergedThread,
+    isStopping:
+      stoppingThreadId !== null && stoppingThreadId === currentViewThreadId,
     pendingUsageMessages,
     sendMessage,
     regenerateMessage,
