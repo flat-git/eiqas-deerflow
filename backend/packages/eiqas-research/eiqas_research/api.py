@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, Response
 from .delivery import ReviewRequest, ReviewService
 from .evidence import EvidenceService
 from .models import Confirmation, ObservationCorrection, Plan, QuestionUpdate, ResearchCreate, ScopeUpdate, StageUpdate
+from .planning import DataAssessment, InputReply, PlanningService
 from .service import Conflict, NotFound, ResearchService
 
 
@@ -65,6 +66,19 @@ def build_router(service: ResearchService) -> APIRouter:
 
     def evidence():
         return EvidenceService(service)
+
+    @router.get("/research/{rid}/planning")
+    def planning_status(rid: str):
+        planning = PlanningService(evidence())
+        return _call(lambda: {"design": planning.inspect(rid), "workflow": planning.workflow(rid)})
+
+    @router.post("/research/{rid}/data-assessments")
+    def assess_data(rid: str, body: DataAssessment):
+        return _call(PlanningService(evidence()).assess, rid, body)
+
+    @router.post("/research/{rid}/input-requests/{request_id}/reply")
+    def reply_input(rid: str, request_id: str, body: InputReply):
+        return _call(PlanningService(evidence()).reply, rid, request_id, **body.model_dump())
 
     @router.post("/research/{rid}/results/{result_id}/review")
     def review_result(rid: str, result_id: str, body: ReviewRequest):

@@ -22,6 +22,42 @@ class Method(Contract):
     name: Text
     rationale: Text
     operation: Literal["aggregate", "growth", "structure", "contribution", "correlation", "cost_benefit", "sensitivity", "python", "evidence_review"]
+    id: Identifier | None = None
+    selected: bool = True
+    role: Literal["primary", "supporting"] = "primary"
+    question_ids: list[Identifier] = Field(default_factory=list, max_length=30)
+    basis: str = Field(default="", max_length=20000)
+    calculation: str = Field(default="", max_length=20000)
+    applicability: str = Field(default="", max_length=20000)
+    expected_outputs: list[Text] = Field(default_factory=list, max_length=30)
+
+
+class ResearchQuestion(Contract):
+    id: Identifier
+    text: Text
+
+
+class QuestionDecision(Contract):
+    question_id: Identifier
+    status: Literal["answer", "partial", "unanswerable"]
+    explanation: Text
+
+
+class DataRequirement(Contract):
+    id: Identifier
+    title: Text
+    method_ids: list[Identifier] = Field(min_length=1, max_length=30)
+    kind: Literal["quantitative", "context"]
+    required: bool = True
+    category: Literal["public", "internal", "expert", "commercial", "collection", "unknown"]
+    fields: list[Text] = Field(min_length=1, max_length=100)
+    metrics: list[Text] = Field(default_factory=list, max_length=100)
+    grain: Text
+    period: Text
+    units: Text
+    channels: list[Text] = Field(min_length=1, max_length=20)
+    impact_if_missing: Text
+    fallback: Text
 
 
 class Plan(Contract):
@@ -31,6 +67,14 @@ class Plan(Contract):
     assumptions: list[Text] = Field(default_factory=list, max_length=100)
     outputs: list[Text] = Field(min_length=1, max_length=100)
     limitations: list[Text] = Field(default_factory=list, max_length=100)
+    decision_use: str = Field(default="", max_length=20000)
+    scope: str = Field(default="", max_length=20000)
+    research_questions: list[ResearchQuestion] = Field(default_factory=list, max_length=30)
+    question_decisions: list[QuestionDecision] = Field(default_factory=list, max_length=30)
+    data_requirements: list[DataRequirement] = Field(default_factory=list, max_length=100)
+    data_constraints: list[Text] = Field(default_factory=list, max_length=100)
+    scope_changes: list[Text] = Field(default_factory=list, max_length=100)
+    open_questions: list[Text] = Field(default_factory=list, max_length=30)
 
 
 class QuestionUpdate(Contract):

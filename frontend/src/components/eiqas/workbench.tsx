@@ -19,6 +19,7 @@ import type {
   Command,
   Dataset,
   Observation,
+  PlanningState,
   Report,
   Research,
   Run,
@@ -28,6 +29,7 @@ import type {
 import { createThread } from "@/core/threads/api";
 
 import { EvidencePanel, type EvidenceSelection } from "./evidence-panel";
+import { PlanningPanel, ResearchInputRequest } from "./planning-panel";
 import { ReportView } from "./report-view";
 import { ResearchChat } from "./research-chat";
 
@@ -63,6 +65,14 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
   });
   const research = studies.data?.find((item) => item.thread_id === threadId);
   const rid = research?.id;
+  const planningQuery = useQuery({
+    queryKey: ["eiqas", rid, "planning"],
+    queryFn: ({ signal }) =>
+      eiqasAPI<PlanningState>(`/research/${rid}/planning`, { signal }),
+    enabled: Boolean(rid),
+    refetchInterval: 2500,
+  });
+  const planning = planningQuery.data;
   const canonicalQuestion = research?.question;
   const sourceQuery = useRecords<Source>(rid, "sources");
   const observationQuery = useRecords<Observation>(rid, "observations");
@@ -91,7 +101,7 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
     if (research && search.get("start") === "1")
       setCommand({
         id: `start-${research.id}`,
-        text: `研究问题：${research.question}。请先讨论必要范围，并保存问题导向的研究方案。给出方法及依据、数据要求、假设、产出和限制。等待我在工作台确认方案后再执行。`,
+        text: `研究问题：${research.question}。请先通过有限轮对话明确决策用途、范围和数据条件，按需从业务、方法、数据角度推敲。提出成熟可行的候选量化方法，保存问题与方法、数据要求的关联。正式确认前先核实公开资料与已有数据，分类列出内部、专家、付费等缺口；根据可得数据重拟方案，保留无法判断的原问题。用 eiqas_read_planning 检查后再请我确认最终方案；确认前不做正式计算。`,
       });
   }, [research?.id, research, search]);
   const commandSent = useCallback(() => {
@@ -99,9 +109,13 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
     if (threadId && search.get("start"))
       history.replaceState(null, "", `/research/${threadId}`);
   }, [search, threadId]);
-  function ask(text: string) {
+  function ask(
+    text: string,
+    hidden = true,
+    advance = Boolean(research?.plan?.confirmed_at),
+  ) {
     setChatOpen(true);
-    setCommand({ id: crypto.randomUUID(), text, hidden: true });
+    setCommand({ id: crypto.randomUUID(), text, hidden, advance });
   }
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -152,6 +166,8 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
       setFollow(true);
       ask(
         "我已在工作台确认当前方案。请按已确认方案自主取得公开原件、准备可追溯的数据、执行真实计算并生成含图表的成果。关键缺失、冲突、OCR存疑或实质改变目标和方法时再询问。不得把业务背景指标或披露数量自动当作 AI 能力评分。完成计算检查后使用 eiqas_submit_result 保存成果。",
+        true,
+        true,
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "确认失败");
@@ -171,7 +187,8 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
     observationQuery.error ??
     datasetQuery.error ??
     runQuery.error ??
-    reportQuery.error;
+    reportQuery.error ??
+    planningQuery.error;
   return (
     <div className="eiqas-layout">
       <aside className="eiqas-sidebar">
@@ -307,7 +324,7 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                   <p>
                     {research.plan?.confirmed_at
                       ? "方案已确认，按问题推进；可以随时回看资料、方法和计算。"
-                      : "先把问题与方案说清楚，再开始数据准备和真实计算。"}
+                      : "通过对话明确问题，核实方法与数据可行性，再确认最终执行方案。"}
                   </p>
                 </div>
                 <nav className="eiqas-stage-nav" aria-label="研究阶段">
@@ -336,6 +353,20 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                   >
                     回到当前推进阶段：{stageNames[research.stage]} →
                   </button>
+                )}
+                {planning?.workflow.request && (
+                  <ResearchInputRequest
+                    key={`${rid}:${planning.workflow.request.id}`}
+                    rid={research.id}
+                    request={planning.workflow.request}
+                    busy={busy}
+                    onReply={(text) => {
+                      void client.invalidateQueries({
+                        queryKey: ["eiqas", rid],
+                      });
+                      ask(text, false, true);
+                    }}
+                  />
                 )}
                 {stage === "question" && (
                   <section className="eiqas-section">
@@ -371,7 +402,7 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                           setFollow(false);
                           setStage("plan");
                           ask(
-                            "请根据当前研究问题设计方案并保存到工作台，说明每种方法的依据、所需数据、假设、预期产出及限制。等待人工确认后再执行。",
+                            "请讨论当前研究问题，设计候选量化方法并保存到工作台。说明方法依据、计算、适用性和预期图表，关联具体问题与数据要求。先核实公开资料和已有数据的可行性，分类列出内部、专家、付费缺口；按实际数据重拟最终方案，保存并核对 read_planning 后等待人工确认。",
                           );
                         }}
                       >
@@ -420,37 +451,49 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                       </div>
                     ) : (
                       <>
-                        <div className="eiqas-method-cards">
-                          {research.plan.content.methods.map(
-                            (method, index) => (
-                              <article key={index}>
-                                <span>
-                                  {String(index + 1).padStart(2, "0")}
-                                </span>
-                                <h3>{method.name}</h3>
-                                <p>{method.rationale}</p>
-                              </article>
-                            ),
-                          )}
-                        </div>
-                        <div className="eiqas-plan-details">
-                          <List
-                            title="需要哪些数据"
-                            values={research.plan.content.required_data}
+                        {(research.workflow_version ?? 1) >= 2 ? (
+                          <PlanningPanel
+                            key={rid}
+                            research={research}
+                            planning={planning}
+                            busy={busy}
+                            onDiscuss={(text) => ask(text, false, false)}
                           />
-                          <List
-                            title="预期交付"
-                            values={research.plan.content.outputs}
-                          />
-                          <List
-                            title="使用的假设"
-                            values={research.plan.content.assumptions}
-                          />
-                          <List
-                            title="当前限制"
-                            values={research.plan.content.limitations}
-                          />
-                        </div>
+                        ) : (
+                          <>
+                            <div className="eiqas-method-cards">
+                              {research.plan.content.methods.map(
+                                (method, index) => (
+                                  <article key={index}>
+                                    <span>
+                                      {String(index + 1).padStart(2, "0")}
+                                    </span>
+                                    <h3>{method.name}</h3>
+                                    <p>{method.rationale}</p>
+                                  </article>
+                                ),
+                              )}
+                            </div>
+                            <div className="eiqas-plan-details">
+                              <List
+                                title="需要哪些数据"
+                                values={research.plan.content.required_data}
+                              />
+                              <List
+                                title="预期交付"
+                                values={research.plan.content.outputs}
+                              />
+                              <List
+                                title="使用的假设"
+                                values={research.plan.content.assumptions}
+                              />
+                              <List
+                                title="当前限制"
+                                values={research.plan.content.limitations}
+                              />
+                            </div>
+                          </>
+                        )}
                         <div className="eiqas-approval">
                           <p>
                             {research.plan.confirmed_at
@@ -459,7 +502,13 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                           </p>
                           <button
                             className="eiqas-primary"
-                            disabled={saving || busy}
+                            disabled={
+                              saving ||
+                              busy ||
+                              (!research.plan.confirmed_at &&
+                                (research.workflow_version ?? 1) >= 2 &&
+                                !planning?.design.can_confirm)
+                            }
                             onClick={() => {
                               if (research.plan?.confirmed_at)
                                 ask(
@@ -528,6 +577,16 @@ export function ResearchWorkbench({ threadId }: { threadId?: string }) {
                       </div>
                     </div>
                     <Scope research={research} />
+                    {(research.workflow_version ?? 1) >= 2 && (
+                      <PlanningPanel
+                        key={rid}
+                        dataOnly
+                        research={research}
+                        planning={planning}
+                        busy={busy}
+                        onDiscuss={(text) => ask(text, false, false)}
+                      />
+                    )}
                     <h3>数据与口径核对</h3>
                     {!observations.length ? (
                       <div className="eiqas-empty">

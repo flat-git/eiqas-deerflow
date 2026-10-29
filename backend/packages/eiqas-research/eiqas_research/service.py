@@ -67,7 +67,7 @@ class ResearchService:
 
     def create(self, data: ResearchCreate) -> dict:
         rid = uuid.uuid4().hex
-        body = {"id": rid, **data.model_dump(), "stage": "question", "status": "draft", "plan": None, "answerable": [], "gaps": [], "created_at": now(), "updated_at": now()}
+        body = {"id": rid, **data.model_dump(), "workflow_version": 2, "stage": "question", "status": "draft", "plan": None, "answerable": [], "gaps": [], "created_at": now(), "updated_at": now()}
         try:
             with self._connection() as db, db:
                 db.execute("INSERT INTO research VALUES(?,?,?)", (rid, data.thread_id, canonical(body)))
@@ -135,12 +135,20 @@ class ResearchService:
         return self._mutate(rid, "plan.saved", payload, update)["plan"]
 
     def confirm_plan(self, rid: str, plan_hash: str) -> dict:
+        from .evidence import EvidenceService
+        from .planning import PlanningService
+
+        planning = PlanningService(EvidenceService(self))
+
         def update(body):
             plan = body["plan"]
             if not plan or plan["hash"] != plan_hash:
                 raise Conflict("方案已更新，请核对当前方案后确认")
             if plan.get("research_question_hash") != digest(body["question"]):
                 raise Conflict("研究问题已变化，请更新方案")
+            if body.get("workflow_version", 1) >= 2:
+                view = planning.validate_confirmation(rid, plan)
+                plan["feasibility_at_confirmation"] = {"requirements": [{"id": r["id"], "requirement_hash": r["requirement_hash"], "status": r["status"], "assessment_id": (r["assessment"] or {}).get("id")} for r in view["requirements"]]}
             plan["confirmed_at"] = plan["confirmed_at"] or now()
             body["status"] = "ready"
             body["stage"] = "data"

@@ -192,3 +192,5 @@ integration, and legacy sources must stay distinct. Community currently offers
 archive import, not a remote marketplace. Screenshot E2E fixtures are demo data.
 
 EIQAS reader status has three separate concerns: numerical checks, AI-declared fulfillment of the confirmed plan, and human reader feedback. Evidence tables use generic columns, scoped filters and the existing provenance drawer. Reader feedback posts to a result-scoped endpoint and refreshes that same result; it never replaces the currently read report or marks outstanding plan items complete.
+
+EIQAS planning-panel.tsx renders question decisions, method rationale/applicability and classified data requirements from the research-scoped planning query. Data boundary edits are visible chat requests, never approval. Critical replies bind the persisted request hash and retain errors. New-plan confirmation stays disabled until server feasibility permits it; the server remains authoritative. Programmatic execution commands carry eiqas_advance; ordinary conversation does not trigger mandatory execution.

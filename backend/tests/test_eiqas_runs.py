@@ -14,6 +14,8 @@ from eiqas_research.worker import analyze
 def prepared(tmp_path):
     research = ResearchService(tmp_path)
     rid = research.create(ResearchCreate(thread_id="runs-thread", question="合成数据求和"))["id"]
+    # Pre-design fixture isolates calculation/receipt invariants; v2 gates have separate tests.
+    research._mutate(rid, "fixture.pre_design", {}, lambda body: body.update(workflow_version=1))
     p = research.save_plan(rid, Plan(question="合成数据求和", methods=[{"name": "聚合", "rationale": "求合计", "operation": "aggregate"}], required_data=["原始值"], outputs=["合计"]))
     evidence = EvidenceService(research)
     source = evidence.register_source(rid, url="https://example.org/synthetic.txt", title="合成数据", organization="test", content=b"100", media_type="text/plain")

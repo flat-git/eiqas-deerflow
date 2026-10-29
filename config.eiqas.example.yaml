@@ -50,12 +50,24 @@ tools:
   - name: eiqas_save_plan
     group: research
     use: eiqas_research.tools:eiqas_save_plan
+  - name: eiqas_read_planning
+    group: research
+    use: eiqas_research.tools:eiqas_read_planning
+  - name: eiqas_assess_data
+    group: research
+    use: eiqas_research.tools:eiqas_assess_data
+  - name: eiqas_request_input
+    group: research
+    use: eiqas_research.tools:eiqas_request_input
   - name: eiqas_update_scope
     group: research
     use: eiqas_research.tools:eiqas_update_scope
   - name: eiqas_acquire_source
     group: research
     use: eiqas_research.tools:eiqas_acquire_source
+  - name: eiqas_import_upload
+    group: research
+    use: eiqas_research.tools:eiqas_import_upload
   - name: eiqas_parse_source
     group: research
     use: eiqas_research.tools:eiqas_parse_source
@@ -75,7 +87,7 @@ tools:
     group: research
     use: eiqas_research.tools:eiqas_execute
   - name: eiqas_save_evidence_table
-    group: eiqas
+    group: research
     use: eiqas_research.tools:eiqas_save_evidence_table
   - name: eiqas_submit_result
     group: research

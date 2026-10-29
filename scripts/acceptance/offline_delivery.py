@@ -75,7 +75,7 @@ def main():
         ),
     )
     # This explicit synthetic test fixture simulates the human gate only here.
-    research.confirm_plan(rid, plan["hash"])
+    # Approval follows actual data feasibility assessment below.
     evidence = EvidenceService(research)
     records = [
         ("区域甲", "2024", "100"),
@@ -135,6 +135,9 @@ def main():
     dataset = evidence.create_dataset(
         rid, "合成区域收入", [obs["id"] for obs in observations]
     )
+    from design_fixture import approve_synthetic_plan
+
+    plan = approve_synthetic_plan(evidence, rid, plan, dataset)
     analysis = AnalysisService(evidence)
     run = analysis.start_run(
         rid,

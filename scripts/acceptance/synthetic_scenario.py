@@ -47,7 +47,7 @@ def main(output: Path):
     )
     # This acceptance fixture explicitly simulates confirmation; it never
     # confirms or changes an operator's research.
-    research.confirm_plan(rid, plan["hash"])
+    # Approval follows actual data feasibility assessment below.
     evidence = EvidenceService(research)
     values = [
         ("2024", "cost", "100000"),
@@ -109,6 +109,9 @@ def main(output: Path):
     dataset = evidence.create_dataset(
         rid, "合成年度现金流", [row["id"] for row in observations]
     )
+    from design_fixture import approve_synthetic_plan
+
+    plan = approve_synthetic_plan(evidence, rid, plan, dataset)
     analysis = AnalysisService(evidence)
 
     def calculate(method: str, parameters: dict):

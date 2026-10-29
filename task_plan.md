@@ -1,5 +1,9 @@
 # EIQAS DeerFlow v0.1
 
+## 当前开发：2026-10-29 研究设计闭环
+
+用户已授权 Git 备份后开发。基线68ec48b5已备份，分支 codex/research-design-loop，Issue #17。方法—数据可行性、分类缺口、可回答范围、重拟方案与最终确认已接入；修改前17128项后端和143项阻塞IO通过，当前前端1639项、断网容器与导出重跑通过。最终17156项后端、138项领域、1639项前端、12项浏览器、生产构建与断网容器通过；真实DeepSeek完成合成草稿自修复。完整无人代修研究与试读仍待验证；不合并、不发布，不把测试报告代修算作自主化验收。详见 docs/research-design-loop.md。
+
 ## Goal and decisions
 
 Independent public product on pinned DeerFlow v2.1.0. Single user, native model configuration, public-source research including Chinese/English OCR, real calculations, interactive reports and reproducible exports. Confirm a research plan once; ask again for material changes or unresolved evidence. No legacy EIQAS migration, drag/drop editor, shared-team deployment or public report hosting.

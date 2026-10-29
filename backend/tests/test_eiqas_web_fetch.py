@@ -6,7 +6,7 @@ import pytest
 from eiqas_research import tools
 from eiqas_research.evidence import EvidenceService
 from eiqas_research.models import Plan, ResearchCreate
-from eiqas_research.service import Conflict, ResearchService
+from eiqas_research.service import ResearchService
 
 
 @pytest.fixture
@@ -14,6 +14,7 @@ def context(tmp_path, monkeypatch):
     service = ResearchService(tmp_path)
     research = service.create(ResearchCreate(thread_id="web-thread", question="公开网页研究"))
     rid = research["id"]
+    service._mutate(rid, "fixture.pre_design", {}, lambda body: body.update(workflow_version=1))
     plan = service.save_plan(rid, Plan(question="公开网页研究", methods=[{"name": "阅读原件", "operation": "evidence_review", "rationale": "取得可回查的证据"}], required_data=["公开原件"], assumptions=[], outputs=["依据"], limitations=[]))
     service.confirm_plan(rid, plan["hash"])
     monkeypatch.setattr(tools, "current", lambda runtime: (service, rid))
@@ -55,7 +56,7 @@ async def test_fetch_downloads_and_parses_before_returning_located_text(context,
 
 
 @pytest.mark.asyncio
-async def test_fetch_does_not_hide_failures_or_bypass_confirmation(context, monkeypatch):
+async def test_fetch_retains_failures_and_allows_new_scope_discovery_before_approval(context, monkeypatch):
     from eiqas_research import acquisition
 
     service, rid, runtime = context
@@ -63,8 +64,9 @@ async def test_fetch_does_not_hide_failures_or_bypass_confirmation(context, monk
     failed = await tools.web_fetch_public.coroutine("https://example.org/denied", runtime)
     assert failed["status"] == "restricted" and failed["reason"] == "HTTP 403"
     service.update_question(rid, "目标改变")
-    with pytest.raises(Conflict):
-        await tools.web_fetch_public.coroutine("https://example.org/denied", runtime)
+    result = await tools.web_fetch_public.coroutine("https://example.org/denied", runtime)
+    assert result["status"] == "restricted"
+    assert service.get(rid)["plan"]["confirmed_at"] is None
 
 
 def test_web_fetch_native_schema_hides_runtime():

@@ -11,11 +11,91 @@ export type Locator = {
 };
 export type PlanContent = {
   question: string;
-  methods: { name: string; rationale: string; operation?: string }[];
+  methods: ResearchMethod[];
   required_data: string[];
   assumptions: string[];
   outputs: string[];
   limitations: string[];
+  decision_use?: string;
+  scope?: string;
+  research_questions?: { id: string; text: string }[];
+  question_decisions?: {
+    question_id: string;
+    status: "answer" | "partial" | "unanswerable";
+    explanation: string;
+  }[];
+  data_constraints?: string[];
+  scope_changes?: string[];
+  open_questions?: string[];
+  data_requirements?: DataRequirement[];
+};
+export type ResearchMethod = {
+  id?: string | null;
+  name: string;
+  rationale: string;
+  operation?: string;
+  selected?: boolean;
+  role?: "primary" | "supporting";
+  question_ids?: string[];
+  basis?: string;
+  calculation?: string;
+  applicability?: string;
+  expected_outputs?: string[];
+};
+export type DataRequirement = {
+  id: string;
+  title: string;
+  method_ids: string[];
+  kind: string;
+  required: boolean;
+  category:
+    | "public"
+    | "internal"
+    | "expert"
+    | "commercial"
+    | "collection"
+    | "unknown";
+  fields: string[];
+  metrics: string[];
+  grain: string;
+  period: string;
+  units: string;
+  channels: string[];
+  impact_if_missing: string;
+  fallback: string;
+};
+export type PlanningState = {
+  design: {
+    can_confirm: boolean;
+    errors: string[];
+    methods: (ResearchMethod & {
+      readiness: string;
+      missing_requirement_ids: string[];
+    })[];
+    requirements: (DataRequirement & {
+      requirement_hash: string;
+      status: string;
+      issue: string;
+      assessment: {
+        reason: string;
+        next_action: string;
+        gap_types: string[];
+        evidence: { source_id: string; quote: string; locator_key: string }[];
+      } | null;
+    })[];
+    question_decisions: NonNullable<PlanContent["question_decisions"]>;
+  };
+  workflow: {
+    action: string;
+    automatic: boolean;
+    request?: {
+      id: string;
+      content_hash: string;
+      questions: string[];
+      impact: string;
+      kind: string;
+    };
+  };
 };
 export type Research = {
   id: string;
@@ -23,6 +103,7 @@ export type Research = {
   question: string;
   stage: Stage;
   status: string;
+  workflow_version?: number;
   plan: {
     hash: string;
     revision: number;
@@ -184,4 +265,9 @@ export type Report = {
   plan: NonNullable<Research["plan"]>;
   created_at: string;
 };
-export type Command = { id: string; text: string; hidden?: boolean };
+export type Command = {
+  id: string;
+  text: string;
+  hidden?: boolean;
+  advance?: boolean;
+};

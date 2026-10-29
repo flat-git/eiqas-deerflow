@@ -23,12 +23,15 @@ class AnalysisService:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def start_run(self, rid: str, dataset_id: str, spec: dict, *, native_run_id: str | None) -> dict:
+    def start_run(self, rid: str, dataset_id: str, spec: dict, *, native_run_id: str | None, method_id: str | None = None) -> dict:
         plan = self.evidence.research.require_confirmed(rid)
         worker.validate_spec(spec)
-        if spec.get("method") not in {method["operation"] for method in plan["content"]["methods"]}:
+        if spec.get("method") not in {method["operation"] for method in plan["content"]["methods"] if method.get("selected", True)}:
             raise Conflict("计算方法不在已确认方案中，请更新方法后重新确认")
         dataset = self.evidence.get(rid, "dataset", dataset_id)
+        from .planning import PlanningService
+
+        method_id = PlanningService(self.evidence).validate_input(rid, plan, dataset, spec["method"], method_id)
         if digest({key: dataset[key] for key in ["title", "rows", "observations"]}) != dataset["input_hash"]:
             raise Conflict("数据集输入哈希不一致")
         for observation in dataset["observations"]:
@@ -48,6 +51,7 @@ class AnalysisService:
                 "input_hash": dataset["input_hash"],
                 "spec": spec,
                 "plan_hash": plan["hash"],
+                "method_id": method_id,
                 "native_run_id": native_run_id,
                 "status": "running",
                 "request_sha256": hashlib.sha256(request_bytes).hexdigest(),
