@@ -37,6 +37,7 @@ function NativeResearchChat({
   const [settings, setSettings] = useThreadSettings(threadId);
   const {
     thread,
+    isStopping,
     sendMessage,
     isHistoryLoading,
     hasMoreHistory,
@@ -125,7 +126,13 @@ function NativeResearchChat({
         <header>
           <span className="eiqas-live-dot" />
           研究对话{" "}
-          <span>{thread.isLoading ? "正在推进" : "与 AI 一起推敲问题"}</span>
+          <span>
+            {isStopping
+              ? "正在停止，请稍候"
+              : thread.isLoading
+                ? "正在推进"
+                : "与 AI 一起推敲问题"}
+          </span>
         </header>
         <div className="eiqas-chat-messages">
           <MessageList
@@ -175,7 +182,13 @@ function NativeResearchChat({
             void pending;
           }}
           onStop={() => {
-            void thread.stop();
+            void thread.stop().catch((error: unknown) => {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "停止未能确认，请重试。",
+              );
+            });
           }}
           canStopStreaming
         />

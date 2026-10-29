@@ -168,8 +168,51 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  sessionStorage.clear();
+  rs.restoreAllMocks();
   rs.useRealTimers();
   rs.unstubAllGlobals();
+});
+
+test("stop stays busy until the server acknowledges finalization and is scoped to its thread", async () => {
+  const { getAPIClient } = await import("@/core/api");
+  let acknowledge!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    acknowledge = resolve;
+  });
+  const cancel = rs
+    .spyOn(getAPIClient().runs, "cancel")
+    .mockReturnValue(pending);
+  sessionStorage.setItem("lg:stream:thread-1", "run-stopping");
+  const hook = await renderSeededThread();
+  let stopped!: Promise<void>;
+  try {
+    await act(async () => {
+      stopped = hook.result.current.thread.stop();
+    });
+    expect(streamMockState.stop).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledWith("thread-1", "run-stopping", true);
+    expect(hook.result.current.thread.isLoading).toBe(true);
+    expect(hook.result.current.isStopping).toBe(true);
+    await expect(
+      hook.result.current.sendMessage("thread-1", {
+        text: "too soon",
+        files: [],
+      }),
+    ).rejects.toThrow();
+    expect(streamMockState.submit).not.toHaveBeenCalled();
+    hook.rerender({ currentThreadId: "thread-2" });
+    expect(hook.result.current.thread.isLoading).toBe(false);
+    expect(hook.result.current.isStopping).toBe(false);
+    await act(async () => {
+      acknowledge();
+      await stopped;
+    });
+    expect(hook.result.current.thread.isLoading).toBe(false);
+  } finally {
+    acknowledge();
+    hook.unmount();
+  }
 });
 
 // Compaction trimmed the checkpoint tail to the latest turn while the REST

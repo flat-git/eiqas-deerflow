@@ -11,3 +11,13 @@
 The public upstream Git history is preserved. Inherited automation is archived under `.github/upstream-workflows/` for reference; only EIQAS workflows are active. In particular, upstream publishing and scheduled automation do not execute in this product repository.
 
 The upstream Harness remains a separate dependency layer. EIQAS business services use public extension contracts; changes to framework internals require a documented reason and regression tests.
+
+## Product runtime patches
+
+- `AioSandbox.execute_command_cancellable` adds explicit per-job shell sessions,
+  short status polling, cancellation and a server hard timeout. EIQAS PDF/OCR and
+  computation previously drained an uncancellable synchronous command after user
+  interruption, keeping the native thread finalizing and rejecting new runs with
+  HTTP 409. Existing shell methods and the Harness loop are unchanged. Tests:
+  `backend/tests/test_eiqas_job_cancellation.py`; details:
+  `docs/interrupted-run-recovery.md`.

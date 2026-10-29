@@ -2,6 +2,7 @@ import base64
 import errno
 import logging
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 
@@ -337,6 +338,71 @@ class AioSandbox(Sandbox):
         except Exception as e:
             logger.error(f"Failed to execute command in sandbox: {e}")
             return f"Error: {e}"
+
+    def execute_command_cancellable(self, command: str, *, cancel_event: threading.Event, timeout: float = 600) -> str:
+        """Execute an isolated job with cooperative cancellation and a real hard limit.
+
+        Poll short SDK requests instead of holding the shared shell lock over a
+        long HTTP call. The owning offload must drain this method after setting
+        cancel_event. Never retry the command: it may already have side effects.
+        """
+        if cancel_event.is_set():
+            raise InterruptedError("Sandbox job cancelled before startup")
+        if timeout <= 0:
+            raise ValueError("Sandbox job timeout must be positive")
+        scope_id = f"job:{uuid.uuid4()}"
+        scoped = _ScopedShellSession(session_id=str(uuid.uuid4()))
+        options = {"timeout_in_seconds": 5, "max_retries": 0}
+        with self._scope_registry_lock:
+            if self._closed or self._client is None:
+                raise RuntimeError("sandbox client is closed")
+            self._scoped_shell_sessions[scope_id] = scoped
+        try:
+            with scoped.lock:
+                client = self._client
+                if client is None or self._closed:
+                    raise RuntimeError("sandbox client is closed")
+                session_id = scoped.session_id
+                completed = False
+                try:
+                    client.shell.create_session(id=session_id, request_options=options)
+                    if cancel_event.is_set() or self._closed:
+                        raise InterruptedError("Sandbox job cancelled before execution")
+                    deadline = time.monotonic() + timeout
+                    result = client.shell.exec_command(command=command, id=session_id, async_mode=True, hard_timeout=timeout, request_options=options)
+                    while True:
+                        if cancel_event.is_set() or self._closed:
+                            raise InterruptedError("Sandbox job cancelled")
+                        status = getattr(getattr(result, "data", None), "status", None)
+                        if status == "completed":
+                            view = client.shell.view(id=session_id, request_options=options)
+                            if getattr(getattr(view, "data", None), "status", None) != "completed":
+                                raise RuntimeError("Sandbox job completion could not be verified")
+                            completed = True
+                            return self._render_shell_output(*self._format_shell_result(view))
+                        if status == "hard_timeout" or time.monotonic() >= deadline:
+                            raise TimeoutError(f"Sandbox job exceeded {timeout:g} seconds")
+                        if status not in ("running", "no_change_timeout"):
+                            raise RuntimeError(f"Sandbox job stopped with status {status!r}")
+                        if not cancel_event.wait(0.1):
+                            result = client.shell.wait_for_process(id=session_id, seconds=1, max_wait_seconds=1, request_options=options)
+                finally:
+                    # These control-plane calls target this job's session only;
+                    # parallel jobs and the persistent user shell remain intact.
+                    if not completed:
+                        try:
+                            client.shell.kill_process(id=session_id, request_options=options)
+                        except Exception:
+                            logger.warning("Failed to stop sandbox job session %s; attempting session cleanup", session_id, exc_info=True)
+                    try:
+                        client.shell.cleanup_session(session_id, request_options=options)
+                    except Exception:
+                        logger.warning("Failed to release sandbox job session %s", session_id, exc_info=True)
+                    scoped.session_id = None
+        finally:
+            with self._scope_registry_lock:
+                if self._scoped_shell_sessions.get(scope_id) is scoped:
+                    self._scoped_shell_sessions.pop(scope_id)
 
     def release_command_scope(self, scope_id: str) -> None:
         """Clean up one subagent's explicit server-side shell session."""

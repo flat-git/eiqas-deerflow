@@ -15,7 +15,7 @@ from .models import Plan
 from .planning import DataAssessment, PlanningService
 from .plugin import active_service, thread_id
 from .reports import ReportDraft, ReportService
-from .sandbox_jobs import execute_job
+from .sandbox_jobs import execute_job_async
 
 
 def current(runtime):
@@ -190,20 +190,13 @@ async def _parse_source(source_id: str, runtime: ToolRuntime) -> dict:
     source = await asyncio.to_thread(evidence.get, rid, "source", source_id)
     path = await asyncio.to_thread(evidence.original, rid, source_id)
     data = await asyncio.to_thread(path.read_bytes)
-    job = None
     try:
         sandbox = await ensure_sandbox_initialized_async(runtime)
-        job = asyncio.create_task(asyncio.to_thread(execute_job, sandbox, "parse", data, source["media_type"]))
-        result, _log = await asyncio.shield(job)
+        result, _log = await execute_job_async(sandbox, "parse", data, source["media_type"])
         if result.get("status") == "failed":
             raise ValueError(result.get("error", "解析失败"))
         return await asyncio.to_thread(evidence.register_extraction, rid, source_id, result)
     except asyncio.CancelledError:
-        if job is not None:
-            try:
-                await asyncio.shield(job)
-            except Exception:
-                pass
         raise
     except Exception as exc:
         failure = await asyncio.to_thread(evidence.put, rid, "extraction", {"source_id": source_id, "source_hash": source["sha256"], "status": "failed", "sha256": None, "result": {"blocks": [], "page_count": None, "error": str(exc)}})
@@ -333,7 +326,6 @@ async def eiqas_execute(dataset_id: str, method: str, parameters: dict, runtime:
     analysis = AnalysisService(evidence)
     context = getattr(runtime, "context", None) or {}
     run = await asyncio.to_thread(analysis.start_run, rid, dataset_id, {"method": method, "parameters": parameters}, native_run_id=context.get("run_id"), method_id=method_id or None)
-    job = None
     try:
         sandbox = await ensure_sandbox_initialized_async(runtime)
         plan = await asyncio.to_thread(service.require_confirmed, rid)
@@ -341,16 +333,10 @@ async def eiqas_execute(dataset_id: str, method: str, parameters: dict, runtime:
             raise ValueError("研究方案已更新，请确认后重新运行")
         directory = await asyncio.to_thread(analysis.run_directory, rid, run["id"])
         data = await asyncio.to_thread((directory / "input.json").read_bytes)
-        job = asyncio.create_task(asyncio.to_thread(execute_job, sandbox, "analyze", data))
-        output, log = await asyncio.shield(job)
+        output, log = await execute_job_async(sandbox, "analyze", data)
         return await asyncio.to_thread(analysis.complete_run, rid, run["id"], output, log=log)
     except asyncio.CancelledError:
         await asyncio.to_thread(analysis.stop_run, rid, run["id"], "cancelled", "原生运行已取消，迟到结果不会提升为成功")
-        if job is not None:
-            try:
-                await asyncio.shield(job)
-            except Exception:
-                pass
         raise
     except Exception as exc:
         return await asyncio.to_thread(analysis.stop_run, rid, run["id"], "failed", str(exc))

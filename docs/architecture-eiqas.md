@@ -16,6 +16,8 @@
 
 业务 I/O 使用同步领域方法；FastAPI 同步路由和原生同步工具在线程池执行。插件生命周期与异步模型钩子使用 `asyncio.to_thread`。单 Gateway worker、单用户为本版边界。
 
+解析与计算的长任务使用 AIO 独立可取消会话，短请求轮询状态、服务端硬超时；取消信号传给实际进程，排空同一 offload 后才退出工具。原生 finalizing 屏障保留，页面等待 `cancel(wait=true)` 确认后才恢复发送。具体边界和复验见 [中断恢复](interrupted-run-recovery.md)。
+
 ## 实施与验收状态
 
 研究记录和确认的首批 14 项离线测试已通过。界面、实际模型推进、OCR、计算和交付分阶段实现与验收，不能从这些契约测试推定端到端完成。以 `docs/v0.1-acceptance.md` 和 GitHub Issue 中的实际证据为准。
