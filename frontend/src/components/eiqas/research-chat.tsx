@@ -76,7 +76,10 @@ function NativeResearchChat({
       /* memory fence still applies */
     }
     void sendMessage(threadId, { text: command.text, files: [] }, undefined, {
-      additionalKwargs: command.hidden ? { hide_from_ui: true } : undefined,
+      additionalKwargs: {
+        hide_from_ui: command.hidden ?? false,
+        eiqas_advance: command.advance ?? false,
+      },
       onSent: onCommandSent,
     }).catch((error: unknown) => {
       toast.error(

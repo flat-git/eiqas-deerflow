@@ -31,7 +31,7 @@ async def run(root: Path, world_bank: bool):
     )
     receipt = {
         "kind": "live-network-and-native-parser",
-        "simulated_acceptance_confirmation": True,
+        "pre_approval_exploration": True,
         "checks": {},
         "pages": [],
     }
@@ -40,7 +40,7 @@ async def run(root: Path, world_bank: bool):
         research = service.create(
             ResearchCreate(thread_id=thread, question="联网工具自检（非正式研究）")
         )
-        plan = service.save_plan(
+        service.save_plan(
             research["id"],
             Plan(
                 question=research["question"],
@@ -56,7 +56,7 @@ async def run(root: Path, world_bank: bool):
             ),
         )
         # Only this explicitly labelled acceptance fixture simulates confirmation.
-        service.confirm_plan(research["id"], plan["hash"])
+        # Public discovery deliberately runs before any final plan confirmation.
         search = json.loads(
             await asyncio.to_thread(
                 web_search_tool.invoke,

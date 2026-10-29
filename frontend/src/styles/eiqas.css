@@ -1225,3 +1225,106 @@
   border: 1px solid #cad5c8;
   border-radius: 8px;
 }
+/* Research design: summary first; technical fields and evidence expand on demand. */
+.eiqas-design-panel h3 {
+  margin: 24px 0 12px;
+}
+.eiqas-design-brief {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+.eiqas-design-brief p {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 16px;
+}
+.eiqas-question-decisions,
+.eiqas-requirement-list {
+  display: grid;
+  gap: 12px;
+}
+.eiqas-question-decisions article,
+.eiqas-requirement-list article {
+  border: 1px solid var(--eiqas-line, #dcded7);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+.eiqas-question-decisions .eiqas-badge {
+  margin-left: 12px;
+}
+.eiqas-design-panel .eiqas-badge {
+  white-space: normal;
+}
+.eiqas-design-panel .eiqas-section-title {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.eiqas-design-panel h4 {
+  margin: 0;
+  font-size: 15px;
+}
+.eiqas-design-panel p {
+  line-height: 1.7;
+}
+.eiqas-design-panel details {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.eiqas-design-panel summary {
+  cursor: pointer;
+  color: #285747;
+  line-height: 1.7;
+}
+.eiqas-design-panel dl {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px 16px;
+  line-height: 1.7;
+}
+.eiqas-design-panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.eiqas-design-panel dt {
+  color: #66716a;
+}
+.eiqas-design-panel blockquote {
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid #a7baaa;
+}
+.eiqas-design-panel blockquote small {
+  display: block;
+  color: #66716a;
+  margin-top: 6px;
+}
+.eiqas-design-boundary,
+.eiqas-input-request {
+  padding: 16px 20px;
+  margin: 20px 0;
+  background: #edf2e9;
+  border-radius: 12px;
+  line-height: 1.8;
+}
+.eiqas-design-boundary ul,
+.eiqas-input-request ul {
+  margin-bottom: 0;
+  padding-left: 20px;
+}
+.eiqas-boundary-input label,
+.eiqas-input-request label {
+  display: block;
+  margin: 12px 0 8px;
+}
+.eiqas-boundary-input button,
+.eiqas-input-request button {
+  margin-top: 10px;
+}
+.eiqas-design-blockers {
+  padding: 12px 16px;
+  background: #f7f0df;
+  border-radius: 8px;
+}

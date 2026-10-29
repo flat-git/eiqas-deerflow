@@ -113,6 +113,14 @@ class ReportService:
         run = self.evidence.get(rid, "run", content.run_id)
         dataset = self.verify_run(rid, run)
         research = self.evidence.research.get(rid)
+        if research.get("workflow_version", 1) >= 2:
+            from .planning import PlanningService
+
+            self.evidence.research.require_confirmed(rid)
+            if not PlanningService(self.evidence).inspect(rid)["can_confirm"]:
+                raise Conflict("研究数据出现新的缺口，请先核实后再交付")
+            if PlanningService(self.evidence).pending_request(rid):
+                raise Conflict("关键问题尚待用户决定，不能提交为当前交付")
         if not research["plan"] or run["plan_hash"] != research["plan"]["hash"]:
             raise Conflict("研究方案已改变，请先确认并完成新方案计算")
         observations = {row["id"]: row for row in dataset["observations"]}

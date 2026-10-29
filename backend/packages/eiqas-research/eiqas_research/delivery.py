@@ -119,15 +119,21 @@ def resolve_coverage(research: dict, content, tables: list[dict], verify_run) ->
         if item.status in {"completed", "not_applicable"} and not (item.run_ids or item.table_ids or item.finding_indices or item.plan_ref):
             raise Conflict("完成或条件不适用的声明需要可复核产物，不接受空声明")
         if item.kind == "method" and item.status == "completed":
+            if not choices[item.index].get("selected", True):
+                raise Conflict("未选用的候选方法不能声明已执行完成")
             operation = choices[item.index]["operation"]
             if operation != "evidence_review" and not any(run["spec"]["method"] in {operation, "python"} for run in runs):
                 raise Conflict("计算方法完成声明需要实际对应计算或定制脚本回执")
+            if research.get("workflow_version", 1) >= 2 and operation != "evidence_review" and not any(run.get("method_id") == choices[item.index].get("id") for run in runs):
+                raise Conflict("方法履行必须关联该选定方法的实际运行")
         declarations[key] = item.model_dump()
     items = []
     for kind, choices in [("method", plan["content"]["methods"]), ("output", plan["content"]["outputs"])]:
         for index, choice in enumerate(choices):
             name = choice["name"] if kind == "method" else choice
             item = declarations.get((kind, index), {"kind": kind, "index": index, "status": "not_addressed", "explanation": "尚未提交本项履行情况，不推定已完成", "run_ids": [], "table_ids": [], "finding_indices": [], "plan_ref": False})
+            if kind == "method" and not choice.get("selected", True):
+                item = {"kind": kind, "index": index, "status": "not_applicable", "explanation": "候选方法未纳入最终执行方案；保留其数据依赖供后续讨论", "run_ids": [], "table_ids": [], "finding_indices": [], "plan_ref": True}
             items.append({**item, "name": name})
     status = "not_assessed" if not declarations else "declared_complete" if all(item["status"] in {"completed", "not_applicable"} for item in items) else "partial"
     return {"status": status, "plan_hash": plan["hash"], "items": items, "note": "这是AI的履行申报与引用核对，不等同于读者确认已回答研究问题。"}, list(auxiliary.values())

@@ -116,6 +116,32 @@ class EvidenceService:
             raise ValueError("无效的取得状态")
         return self.put(rid, "source", {"url": url, "title": title, "organization": organization, "retrieved_at": now(), "status": status, "reason": reason, "sha256": None, "path": None})
 
+    def import_upload(self, rid: str, *, filename: str, content: bytes, media_type: str) -> dict:
+        if not filename or Path(filename).name != filename or "\\" in filename or filename in {".", ".."}:
+            raise ValueError("上传文件名无效")
+        if not content or len(content) > 64 * 1024 * 1024:
+            raise ValueError("上传原件为空或超过 64 MiB")
+        relative = f"sources/{uuid.uuid4().hex}/original.bin"
+        original = self.directory(rid) / relative
+        original.parent.mkdir(parents=True)
+        original.write_bytes(content)
+        return self.put(
+            rid,
+            "source",
+            {
+                "url": "",
+                "title": filename,
+                "organization": "用户提供",
+                "origin": "upload",
+                "retrieved_at": now(),
+                "status": "acquired",
+                "media_type": media_type,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+                "path": relative,
+            },
+        )
+
     def original(self, rid: str, source_id: str) -> Path:
         source = self.get(rid, "source", source_id)
         if source["status"] != "acquired":

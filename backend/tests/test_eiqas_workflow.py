@@ -17,7 +17,10 @@ def service(tmp_path):
 
 @pytest.fixture
 def research(service):
-    return service.create(ResearchCreate(thread_id="thread-a", question="收入变化由什么驱动？"))
+    row = service.create(ResearchCreate(thread_id="thread-a", question="收入变化由什么驱动？"))
+    # Retain the historical confirmation tests independently of new design gates.
+    service._mutate(row["id"], "fixture.pre_design", {}, lambda body: body.update(workflow_version=1))
+    return row
 
 
 def plan():
@@ -70,7 +73,7 @@ def test_reentrant_stages_and_events_survive_refresh(service, research, tmp_path
     service.set_stage(rid, "review")
     service.set_stage(rid, "data")
     events = ResearchService(tmp_path).events(rid, after=0)
-    assert [event["kind"] for event in events] == ["research.created", "stage.changed", "stage.changed"]
+    assert [event["kind"] for event in events] == ["research.created", "fixture.pre_design", "stage.changed", "stage.changed"]
     assert events[-1]["payload"]["stage"] == "data"
     assert service.events(rid, after=events[-1]["seq"]) == []
 
@@ -87,8 +90,8 @@ def test_parallel_writes_keep_events_ordered(service, research):
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda _: service.set_stage(rid, "data"), range(12)))
     events = service.events(rid)
-    assert len(events) == 13
-    assert len({event["seq"] for event in events}) == 13
+    assert len(events) == 14
+    assert len({event["seq"] for event in events}) == 14
 
 
 @pytest.mark.parametrize("thread_id", ["../other", "/tmp/x", "", "a/b", "a\\b"])

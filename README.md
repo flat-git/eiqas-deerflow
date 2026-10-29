@@ -59,3 +59,7 @@ MIT. Original DeerFlow copyright and third-party notices are retained. This inde
 已通过原生模型/工具往返、自制中英扫描OCR、94项EIQAS后端测试、1634项完整前端单元测试、九项桌面滚动与追问布局测试、三项断网HTML浏览器测试，以及实际容器计算与ZIP重跑。美的／海尔案例已生成6张图和26项逐格复算；合成成本收益情景亦通过。真实联网自检覆盖原生搜索、海尔网页、公开PDF、世界银行JSON与沙箱内HTTPS。跨主题真实研究、完整浏览器交互与读者试读仍待验收。参见[架构与接口](docs/architecture-eiqas.md)、[实际验收记录](docs/v0.1-acceptance.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 [公开进度看板](https://github.com/users/flat-git/projects/1)按M0—M5跟踪实际验收，未完成的验收任务保持开放。
+
+## 研究设计开发迭代（2026-10-29）
+
+新建研究先讨论商业问题与候选量化方法，核实公开样本或已有数据，分类说明公开、内部、专家和付费等缺口，再根据实际数据重拟最终方案。方法与数据面板保留原问题的可回答范围，支持通过对话说明数据边界。最终确认前可探索资料，正式计算必须使用选定方法关联的实际输入。关键追问持久化，普通推进在原生回合内有界续行。详见[设计与验收边界](docs/research-design-loop.md)。这不代表真实无人代修研究已通过，跟踪 Issue #17。
