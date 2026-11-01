@@ -8,7 +8,7 @@ ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.1
 FROM ${UV_IMAGE} AS uv-source
 
 # ── Stage 1: Builder ──────────────────────────────────────────────────────────
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS deps
 
 ARG NODE_MAJOR=22
 ARG APT_MIRROR
@@ -50,14 +50,59 @@ COPY --from=uv-source /uv /uvx /usr/local/bin/
 # Set working directory
 WORKDIR /app
 
-# Copy backend source code
-COPY backend ./backend
+# Install external runtime dependencies without the changing workspace source.
+# --frozen supports the manifest-only workspace. The final --locked sync below
+# validates all workspace manifests and installs operator-managed extensions.
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    sh -c 'cd backend && \
+    set -f; \
+    extras_flags=""; \
+    for extra in $(printf "%s" "$UV_EXTRAS" | tr "," " "); do \
+        case "$extra" in \
+            [!A-Za-z]* | *[!A-Za-z0-9_-]*) \
+                echo "UV_EXTRAS entry $extra is invalid (must match [A-Za-z][A-Za-z0-9_-]*)" >&2; \
+                exit 1; \
+                ;; \
+        esac; \
+        extras_flags="$extras_flags --extra $extra"; \
+    done; \
+    UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} uv sync --frozen --no-install-workspace --no-group extensions --no-dev --extra redis $extras_flags'
 
-# Install dependencies with cache mount
-# `redis` is always installed because Docker Compose defaults the stream bridge
-# to Redis (DEER_FLOW_STREAM_BRIDGE_REDIS_URL); it is an optional extra elsewhere
-# so slim non-Docker installs do not pull it.
-# When UV_EXTRAS is set (comma- or whitespace-separated), installs optional dependencies.
+FROM deps AS builder
+COPY backend ./backend
+# redis remains available for Compose, UV_EXTRAS remain validated tokens, and
+# --no-dev preserves the default extensions group while excluding dev tools.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    sh -c 'cd backend && \
+    set -f; \
+    extras_flags=""; \
+    for extra in $(printf "%s" "$UV_EXTRAS" | tr "," " "); do \
+        case "$extra" in \
+            [!A-Za-z]* | *[!A-Za-z0-9_-]*) \
+                echo "UV_EXTRAS entry $extra is invalid (must match [A-Za-z][A-Za-z0-9_-]*)" >&2; \
+                exit 1; \
+                ;; \
+        esac; \
+        extras_flags="$extras_flags --extra $extra"; \
+    done; \
+    UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} uv sync --locked --no-dev --extra redis $extras_flags'
+# Keep an empty extension directory when no operator snapshots are installed,
+# so the selective runtime COPY also works for a clean checkout.
+RUN mkdir -p /app/backend/extensions
+
+# UTF-8 locale prevents UnicodeEncodeError on Chinese/emoji content in minimal
+# containers where locale configuration may be missing and the default encoding is not UTF-8.
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PYTHONIOENCODING=utf-8
+
+# ── Stage 2: Dev ──────────────────────────────────────────────────────────────
+# Retains compiler toolchain from builder so startup-time `uv sync` can build
+# source distributions in development containers.
+FROM builder AS dev
+
+# Development retains its test/lint dependencies and compiler toolchain.
 RUN --mount=type=cache,target=/root/.cache/uv \
     sh -c 'cd backend && \
     set -f; \
@@ -72,17 +117,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         extras_flags="$extras_flags --extra $extra"; \
     done; \
     UV_INDEX_URL=${UV_INDEX_URL:-https://pypi.org/simple} uv sync --locked --extra redis $extras_flags'
-
-# UTF-8 locale prevents UnicodeEncodeError on Chinese/emoji content in minimal
-# containers where locale configuration may be missing and the default encoding is not UTF-8.
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-ENV PYTHONIOENCODING=utf-8
-
-# ── Stage 2: Dev ──────────────────────────────────────────────────────────────
-# Retains compiler toolchain from builder so startup-time `uv sync` can build
-# source distributions in development containers.
-FROM builder AS dev
 
 # Install Docker CLI (for DooD: allows starting sandbox containers via host Docker socket)
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
@@ -117,8 +151,13 @@ COPY --from=uv-source /uv /uvx /usr/local/bin/
 # Set working directory
 WORKDIR /app
 
-# Copy backend with pre-built virtualenv from builder
-COPY --from=builder /app/backend ./backend
+# Runtime files only: no tests, samples, caches or development scripts.
+# Editable workspace packages retain the same paths as in the builder.
+COPY --from=builder /app/backend/.venv ./backend/.venv
+COPY --from=builder /app/backend/pyproject.toml /app/backend/uv.lock /app/backend/README.md ./backend/
+COPY --from=builder /app/backend/app ./backend/app
+COPY --from=builder /app/backend/packages ./backend/packages
+COPY --from=builder /app/backend/extensions ./backend/extensions
 
 # Expose Gateway API port.
 EXPOSE 8001

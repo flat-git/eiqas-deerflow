@@ -21,14 +21,15 @@ BASH = find_script_bash()
 pytestmark = pytest.mark.skipif(BASH is None, reason="repo shell-script tests need Git Bash on Windows")
 
 
-def _backend_dockerfile_uv_sync_script() -> str:
+def _backend_dockerfile_uv_sync_scripts() -> list[str]:
     dockerfile = (REPO_ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
-    match = re.search(r"""sh -c (?P<quote>["'])(?P<script>.*?uv sync.*?)(?P=quote)""", dockerfile, re.S)
-    assert match is not None
-    return match.group("script").replace("\\\n", "\n")
+    matches = list(re.finditer(r"""sh -c (?P<quote>["'])(?P<script>.*?uv sync.*?)(?P=quote)""", dockerfile, re.S))
+    assert len(matches) == 3  # external deps, runtime workspace, development
+    return [match.group("script").replace("\\\n", "\n") for match in matches]
 
 
-def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
+@pytest.mark.parametrize("sync_index", range(3))
+def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path, sync_index):
     """Dockerfile build args must become repeated uv --extra flags."""
     workdir = tmp_path / "work"
     backend = workdir / "backend"
@@ -49,7 +50,7 @@ def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
     env["UV_EXTRAS"] = "discord,postgres"
 
     subprocess.run(
-        [BASH, "-c", _backend_dockerfile_uv_sync_script()],
+        [BASH, "-c", _backend_dockerfile_uv_sync_scripts()[sync_index]],
         cwd=workdir,
         env=env,
         check=True,
@@ -57,7 +58,7 @@ def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
 
     assert capture.read_text(encoding="utf-8").splitlines() == [
         "sync",
-        "--locked",
+        *(["--frozen", "--no-install-workspace", "--no-group", "extensions", "--no-dev"] if sync_index == 0 else ["--locked", "--no-dev"] if sync_index == 1 else ["--locked"]),
         "--extra",
         "redis",
         "--extra",
@@ -67,7 +68,8 @@ def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
     ]
 
 
-def test_backend_dockerfile_rejects_glob_uv_extra(tmp_path):
+@pytest.mark.parametrize("sync_index", range(3))
+def test_backend_dockerfile_rejects_glob_uv_extra(tmp_path, sync_index):
     """Dockerfile extras must reject globs before invoking uv."""
     workdir = tmp_path / "work"
     backend = workdir / "backend"
@@ -89,7 +91,7 @@ def test_backend_dockerfile_rejects_glob_uv_extra(tmp_path):
     env["UV_EXTRAS"] = "postgres,*"
 
     result = subprocess.run(
-        [BASH, "-c", _backend_dockerfile_uv_sync_script()],
+        [BASH, "-c", _backend_dockerfile_uv_sync_scripts()[sync_index]],
         cwd=workdir,
         env=env,
         check=False,

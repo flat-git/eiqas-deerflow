@@ -194,3 +194,7 @@ archive import, not a remote marketplace. Screenshot E2E fixtures are demo data.
 EIQAS reader status has three separate concerns: numerical checks, AI-declared fulfillment of the confirmed plan, and human reader feedback. Evidence tables use generic columns, scoped filters and the existing provenance drawer. Reader feedback posts to a result-scoped endpoint and refreshes that same result; it never replaces the currently read report or marks outstanding plan items complete.
 
 EIQAS planning-panel.tsx renders question decisions, method rationale/applicability and classified data requirements from the research-scoped planning query. Data boundary edits are visible chat requests, never approval. Critical replies bind the persisted request hash and retain errors. New-plan confirmation stays disabled until server feasibility permits it; the server remains authoritative. Programmatic execution commands carry eiqas_advance; ordinary conversation does not trigger mandatory execution.
+
+## Container build contract
+
+`Dockerfile` installs pinned dependencies from package/lock/workspace manifests before copying application source. Both dev and builder inherit that layer. The prod target enables `NEXT_CONFIG_BUILD_OUTPUT=standalone`, copies traced server files plus `public` and `.next/static`, and starts `node server.js` with runtime environment variables. Do not copy the full builder tree or `.next/cache` into prod. Verify dynamic login, EIQAS routes, docs/MDX and static assets against the actual image after changing tracing/build settings.
