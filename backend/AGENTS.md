@@ -395,3 +395,7 @@ See `docs/` directory for detailed documentation:
 - [PATH_EXAMPLES.md](docs/PATH_EXAMPLES.md) - Path types and usage
 - [summarization.md](docs/summarization.md) - Context summarization
 - [plan_mode_usage.md](docs/plan_mode_usage.md) - Plan mode with TodoList
+
+## Production container dependency boundary
+
+`Dockerfile` first syncs external runtime dependencies from `pyproject.toml`/`uv.lock` with `--frozen --no-install-workspace --no-group extensions --no-dev`; the source-stage `--locked --no-dev` sync validates workspace metadata and installs the default operator-managed extensions group. Preserve `redis` and validated `UV_EXTRAS` in every sync. Dev adds development dependencies separately. Runtime copies `.venv`, app, workspace packages, extension snapshots and project metadata at the original editable paths; do not copy the full backend tree. Test/sample/developer caches are excluded from the context, with the existing managed-extension exception retained. See `docs/build-storage.md` for runtime and cache acceptance.
